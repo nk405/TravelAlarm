@@ -5,7 +5,6 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:travelalarm/main.dart';
@@ -16,9 +15,8 @@ void main() {
 
     // AppBar title
     expect(find.text('TravelAlarm'), findsOneWidget);
-    // Fields for latitude/longitude
-    expect(find.widgetWithText(TextField, 'Latitude'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Longitude'), findsOneWidget);
+    // Destination map picker
+    expect(find.text('Pick destination on map'), findsOneWidget);
     // Start button
     expect(find.text('Start'), findsOneWidget);
   });

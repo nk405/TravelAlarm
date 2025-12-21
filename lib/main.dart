@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as ll;
 
 import 'services/geofence_monitor.dart';
 import 'services/notification_service.dart';
@@ -44,10 +46,13 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _latController = TextEditingController();
-  final _lngController = TextEditingController();
   double _radius = 300; // meters
   GeofenceMonitor? _monitor;
+  ll.LatLng? _destination;
+
+  final MapController _mainMapController = MapController();
+  bool _followUserOnMainMap = true;
+  double _mainMapZoom = 14;
 
   @override
   void initState() {
@@ -57,8 +62,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
-    _latController.dispose();
-    _lngController.dispose();
     _monitor?.dispose();
     super.dispose();
   }
@@ -71,20 +74,19 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _startMonitoring() async {
-    final lat = double.tryParse(_latController.text);
-    final lng = double.tryParse(_lngController.text);
-    if (lat == null || lng == null) {
+    final dest = _destination;
+    if (dest == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter valid latitude and longitude')),
+        const SnackBar(content: Text('Pick a destination on the map first')),
       );
       return;
     }
     await _requestLocationPermission();
     _monitor?.dispose();
     _monitor = GeofenceMonitor(
-      destLat: lat,
-      destLng: lng,
+      destLat: dest.latitude,
+      destLng: dest.longitude,
       radiusMeters: _radius,
     );
     final started = await _monitor!.start();
@@ -120,39 +122,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Destination (lat, lng)'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _latController,
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _lngController,
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            const Text('Destination'),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
@@ -161,17 +131,23 @@ class _MyHomePageState extends State<MyHomePage> {
                   final result = await Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const MapPickerPage()),
                   );
-                  if (result != null) {
-                    // Result is a LatLng from flutter_map (latlong2)
-                    final lat = result.latitude as double? ?? result.latitude;
-                    final lng = result.longitude as double? ?? result.longitude;
-                    _latController.text = lat.toStringAsFixed(6);
-                    _lngController.text = lng.toStringAsFixed(6);
+                  if (result != null && result is ll.LatLng) {
+                    setState(() => _destination = result);
                   }
                 },
                 icon: const Icon(Icons.map),
-                label: const Text('Pick on map'),
+                label: Text(
+                  _destination == null
+                      ? 'Pick destination on map'
+                      : 'Change destination',
+                ),
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _destination == null
+                  ? 'No destination selected'
+                  : 'Selected: ${_destination!.latitude.toStringAsFixed(6)}, ${_destination!.longitude.toStringAsFixed(6)}',
             ),
             const SizedBox(height: 16),
             Text('Radius: ${_radius.toStringAsFixed(0)} m'),
@@ -188,7 +164,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: _startMonitoring,
+                    onPressed: _destination == null ? null : _startMonitoring,
                     icon: const Icon(Icons.play_arrow),
                     label: const Text('Start'),
                   ),
@@ -229,7 +205,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   final text =
                       dist == null
                           ? 'Awaiting location...'
-                          : 'Current distance: ${dist.toStringAsFixed(1)} m';
+                          : 'Remaining distance (driving): ${dist.toStringAsFixed(0)} m';
                   return Text(
                     text,
                     style: Theme.of(context).textTheme.titleMedium,
@@ -246,6 +222,160 @@ class _MyHomePageState extends State<MyHomePage> {
                         color: running ? Colors.green : Colors.red,
                       ),
                     ),
+              ),
+            if (_monitor != null)
+              ValueListenableBuilder<bool>(
+                valueListenable: _monitor!.monitoring,
+                builder: (context, running, _) {
+                  if (!running) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      height: 260,
+                      child: Stack(
+                        children: [
+                          FlutterMap(
+                            mapController: _mainMapController,
+                            options: MapOptions(
+                              initialCenter:
+                                  _destination ?? const ll.LatLng(0, 0),
+                              initialZoom: _mainMapZoom,
+                              onPositionChanged: (pos, hasGesture) {
+                                // Track zoom so following keeps the user's chosen zoom.
+                                if (!hasGesture) return;
+                                final zoom = pos.zoom;
+                                if (zoom == null) return;
+                                _mainMapZoom = zoom;
+                              },
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName:
+                                    'com.travelalarm.travelalarm',
+                                subdomains: const [],
+                              ),
+                              ValueListenableBuilder<List<ll.LatLng>>(
+                                valueListenable: _monitor!.routePoints,
+                                builder: (context, pts, _) {
+                                  if (pts.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: pts,
+                                        strokeWidth: 5,
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              if (_destination != null)
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: _destination!,
+                                      width: 40,
+                                      height: 40,
+                                      child: const Icon(
+                                        Icons.place,
+                                        color: Colors.red,
+                                        size: 36,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ValueListenableBuilder<ll.LatLng?>(
+                                valueListenable: _monitor!.currentPosition,
+                                builder: (context, pos, _) {
+                                  if (pos == null) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  if (_followUserOnMainMap) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (!mounted) return;
+                                          _mainMapController.move(
+                                            pos,
+                                            _mainMapZoom,
+                                          );
+                                        });
+                                  }
+
+                                  return MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: pos,
+                                        width: 20,
+                                        height: 20,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 3,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: Material(
+                              color: Theme.of(context).colorScheme.surface,
+                              shape: const CircleBorder(),
+                              elevation: 2,
+                              child: IconButton(
+                                tooltip:
+                                    _followUserOnMainMap
+                                        ? 'Following location'
+                                        : 'Follow location',
+                                icon: Icon(
+                                  _followUserOnMainMap
+                                      ? Icons.my_location
+                                      : Icons.location_searching,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _followUserOnMainMap =
+                                        !_followUserOnMainMap;
+                                  });
+
+                                  if (_followUserOnMainMap) {
+                                    final pos = _monitor!.currentPosition.value;
+                                    if (pos != null) {
+                                      _mainMapController.move(
+                                        pos,
+                                        _mainMapZoom,
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             const Spacer(),
             const Text(

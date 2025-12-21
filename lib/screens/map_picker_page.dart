@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:http/http.dart' as http;
 
+import '../services/route_service.dart';
+
 class _PlaceResult {
   const _PlaceResult({required this.title, required this.point});
 
@@ -130,7 +132,8 @@ class _MapPickerPageState extends State<MapPickerPage> {
     });
 
     try {
-      final points = await _fetchDrivingRoute(from: from, to: to);
+      final result = await RouteService.fetchDrivingRoute(from: from, to: to);
+      final points = result.points;
       if (!mounted) return;
       setState(() {
         _routePoints = points;
@@ -147,52 +150,6 @@ class _MapPickerPageState extends State<MapPickerPage> {
         setState(() => _routing = false);
       }
     }
-  }
-
-  Future<List<ll.LatLng>> _fetchDrivingRoute({
-    required ll.LatLng from,
-    required ll.LatLng to,
-  }) async {
-    // OSRM public demo server (no API key). Coordinates are lon,lat.
-    final path =
-        '/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
-    final uri = Uri.https('router.project-osrm.org', path, {
-      'overview': 'full',
-      'geometries': 'geojson',
-    });
-
-    final resp = await http.get(
-      uri,
-      headers: const {
-        'User-Agent': 'TravelAlarm/1.0 (Flutter; contact: local)',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (resp.statusCode != 200) {
-      throw Exception('HTTP ${resp.statusCode}');
-    }
-
-    final decoded = jsonDecode(resp.body);
-    if (decoded is! Map) return const [];
-    final routes = decoded['routes'];
-    if (routes is! List || routes.isEmpty) return const [];
-    final first = routes.first;
-    if (first is! Map) return const [];
-    final geometry = first['geometry'];
-    if (geometry is! Map) return const [];
-    final coords = geometry['coordinates'];
-    if (coords is! List) return const [];
-
-    final points = <ll.LatLng>[];
-    for (final c in coords) {
-      if (c is! List || c.length < 2) continue;
-      final lon = (c[0] as num?)?.toDouble();
-      final lat = (c[1] as num?)?.toDouble();
-      if (lat == null || lon == null) continue;
-      points.add(ll.LatLng(lat, lon));
-    }
-    return points;
   }
 
   Future<void> _searchPlace(String query) async {
