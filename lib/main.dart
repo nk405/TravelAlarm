@@ -184,21 +184,43 @@ class _MyHomePageState extends State<MyHomePage> {
               onChanged: (v) => setState(() => _radius = v),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _startMonitoring,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start'),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: _stopMonitoring,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop'),
-                ),
-              ],
-            ),
+            if (_monitor == null)
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _startMonitoring,
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Start'),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.stop),
+                    label: const Text('Stop'),
+                  ),
+                ],
+              )
+            else
+              ValueListenableBuilder<bool>(
+                valueListenable: _monitor!.monitoring,
+                builder: (context, running, _) {
+                  return Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: running ? null : _startMonitoring,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Start'),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: running ? _stopMonitoring : null,
+                        icon: const Icon(Icons.stop),
+                        label: const Text('Stop'),
+                      ),
+                    ],
+                  );
+                },
+              ),
             const SizedBox(height: 16),
             if (_monitor != null)
               ValueListenableBuilder<double?>(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -26,10 +27,17 @@ class _MapPickerPageState extends State<MapPickerPage> {
   ll.LatLng _center = const ll.LatLng(0, 0);
   double _zoom = 3;
 
+  StreamSubscription<Position>? _posSub;
+  ll.LatLng? _userLocation;
+
   final TextEditingController _searchController = TextEditingController();
   bool _searching = false;
   String? _searchError;
   List<_PlaceResult> _results = const [];
+
+  bool _routing = false;
+  String? _routeError;
+  List<ll.LatLng> _routePoints = const [];
 
   @override
   void initState() {
@@ -39,6 +47,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
 
   @override
   void dispose() {
+    _posSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -52,18 +61,54 @@ class _MapPickerPageState extends State<MapPickerPage> {
         perm == LocationPermission.whileInUse) {
       try {
         final pos = await Geolocator.getCurrentPosition();
+        final current = ll.LatLng(pos.latitude, pos.longitude);
         setState(() {
-          _center = ll.LatLng(pos.latitude, pos.longitude);
+          _center = current;
           _zoom = 15;
+          _userLocation = current;
         });
+
+        // `initialCenter` only applies at first build; actively move the map too.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _mapController.move(_center, _zoom);
+        });
+
+        _startLocationStream();
+        if (_selected != null) {
+          unawaited(_updateRouteIfPossible());
+        }
       } catch (_) {
         // Keep default center
       }
     }
   }
 
+  void _startLocationStream() {
+    _posSub?.cancel();
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: 10,
+    );
+    _posSub = Geolocator.getPositionStream(locationSettings: settings).listen(
+      (pos) {
+        final current = ll.LatLng(pos.latitude, pos.longitude);
+        if (!mounted) return;
+        setState(() => _userLocation = current);
+      },
+      onError: (_) {
+        // Ignore stream errors; map can still work without live updates.
+      },
+    );
+  }
+
   void _onTap(ll.LatLng latLng) {
-    setState(() => _selected = latLng);
+    setState(() {
+      _selected = latLng;
+      _routeError = null;
+      _routePoints = const [];
+    });
+    unawaited(_updateRouteIfPossible());
   }
 
   void _confirm() {
@@ -72,6 +117,82 @@ class _MapPickerPageState extends State<MapPickerPage> {
     } else {
       Navigator.of(context).pop(null);
     }
+  }
+
+  Future<void> _updateRouteIfPossible() async {
+    final from = _userLocation;
+    final to = _selected;
+    if (from == null || to == null) return;
+
+    setState(() {
+      _routing = true;
+      _routeError = null;
+    });
+
+    try {
+      final points = await _fetchDrivingRoute(from: from, to: to);
+      if (!mounted) return;
+      setState(() {
+        _routePoints = points;
+        _routeError = points.isEmpty ? 'No route found' : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _routePoints = const [];
+        _routeError = 'Route unavailable. Check internet connection.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _routing = false);
+      }
+    }
+  }
+
+  Future<List<ll.LatLng>> _fetchDrivingRoute({
+    required ll.LatLng from,
+    required ll.LatLng to,
+  }) async {
+    // OSRM public demo server (no API key). Coordinates are lon,lat.
+    final path =
+        '/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
+    final uri = Uri.https('router.project-osrm.org', path, {
+      'overview': 'full',
+      'geometries': 'geojson',
+    });
+
+    final resp = await http.get(
+      uri,
+      headers: const {
+        'User-Agent': 'TravelAlarm/1.0 (Flutter; contact: local)',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (resp.statusCode != 200) {
+      throw Exception('HTTP ${resp.statusCode}');
+    }
+
+    final decoded = jsonDecode(resp.body);
+    if (decoded is! Map) return const [];
+    final routes = decoded['routes'];
+    if (routes is! List || routes.isEmpty) return const [];
+    final first = routes.first;
+    if (first is! Map) return const [];
+    final geometry = first['geometry'];
+    if (geometry is! Map) return const [];
+    final coords = geometry['coordinates'];
+    if (coords is! List) return const [];
+
+    final points = <ll.LatLng>[];
+    for (final c in coords) {
+      if (c is! List || c.length < 2) continue;
+      final lon = (c[0] as num?)?.toDouble();
+      final lat = (c[1] as num?)?.toDouble();
+      if (lat == null || lon == null) continue;
+      points.add(ll.LatLng(lat, lon));
+    }
+    return points;
   }
 
   Future<void> _searchPlace(String query) async {
@@ -152,8 +273,11 @@ class _MapPickerPageState extends State<MapPickerPage> {
       _zoom = 15;
       _results = const [];
       _searchError = null;
+      _routeError = null;
+      _routePoints = const [];
     });
     _mapController.move(r.point, 15);
+    unawaited(_updateRouteIfPossible());
   }
 
   @override
@@ -183,6 +307,33 @@ class _MapPickerPageState extends State<MapPickerPage> {
                 userAgentPackageName: 'com.travelalarm.travelalarm',
                 subdomains: const [],
               ),
+              if (_routePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 5,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+              if (_userLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userLocation!,
+                      width: 20,
+                      height: 20,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).colorScheme.primary,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               if (_selected != null)
                 MarkerLayer(
                   markers: [
@@ -311,6 +462,19 @@ class _MapPickerPageState extends State<MapPickerPage> {
                     : 'Selected: ${_selected!.latitude.toStringAsFixed(6)}, ${_selected!.longitude.toStringAsFixed(6)}',
                 textAlign: TextAlign.center,
               ),
+              if (_selected != null && (_routing || _routeError != null)) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _routing ? 'Fetching route…' : _routeError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color:
+                        _routing
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
