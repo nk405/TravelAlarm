@@ -87,7 +87,19 @@ class _MyHomePageState extends State<MyHomePage> {
       destLng: lng,
       radiusMeters: _radius,
     );
-    await _monitor!.start();
+    final started = await _monitor!.start();
+    if (!started) {
+      _monitor?.dispose();
+      _monitor = null;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to start monitoring. Enable Location services and allow location permission.',
+          ),
+        ),
+      );
+    }
     setState(() {});
   }
 

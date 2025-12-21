@@ -61,7 +61,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
         actions: [
           TextButton(
             onPressed: _confirm,
-            child: const Text('Done', style: TextStyle(color: Colors.white)),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -91,18 +91,30 @@ class _MapPickerPageState extends State<MapPickerPage> {
             ),
         ],
       ),
-      bottomNavigationBar:
-          _selected == null
-              ? const SizedBox.shrink()
-              : SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    'Selected: ${_selected!.latitude.toStringAsFixed(6)}, ${_selected!.longitude.toStringAsFixed(6)}',
-                    textAlign: TextAlign.center,
-                  ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _selected == null
+                    ? 'Tap on the map to select a destination'
+                    : 'Selected: ${_selected!.latitude.toStringAsFixed(6)}, ${_selected!.longitude.toStringAsFixed(6)}',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _selected == null ? null : _confirm,
+                  child: const Text('Confirm location'),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

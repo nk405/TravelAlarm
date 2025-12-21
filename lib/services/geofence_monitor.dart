@@ -38,7 +38,16 @@ class GeofenceMonitor {
     return permission;
   }
 
-  Future<void> start() async {
+  Future<bool> start() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('Location services disabled; cannot start monitoring.');
+      }
+      return false;
+    }
+
     final permission = await ensurePermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -46,7 +55,7 @@ class GeofenceMonitor {
         // ignore: avoid_print
         print('Location permission denied; cannot start monitoring.');
       }
-      return;
+      return false;
     }
     await NotificationService.instance.init();
     monitoring.value = true;
@@ -91,6 +100,8 @@ class GeofenceMonitor {
       },
       cancelOnError: false,
     );
+
+    return true;
   }
 
   Future<void> stop() async {
@@ -102,6 +113,8 @@ class GeofenceMonitor {
 
   void dispose() {
     _sub?.cancel();
+    // Ensure we don't leave a looping alarm playing.
+    unawaited(AlarmService.instance.stopAlarm());
     currentDistanceMeters.dispose();
     monitoring.dispose();
   }
