@@ -17,7 +17,6 @@ class RouteService {
     required ll.LatLng from,
     required ll.LatLng to,
   }) async {
-    // OSRM public demo server (no API key). Coordinates are lon,lat.
     final path =
         '/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
     final uri = Uri.https('router.project-osrm.org', path, {

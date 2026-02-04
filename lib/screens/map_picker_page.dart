@@ -70,7 +70,6 @@ class _MapPickerPageState extends State<MapPickerPage> {
           _userLocation = current;
         });
 
-        // `initialCenter` only applies at first build; actively move the map too.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           _mapController.move(_center, _zoom);
@@ -80,9 +79,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
         if (_selected != null) {
           unawaited(_updateRouteIfPossible());
         }
-      } catch (_) {
-        // Keep default center
-      }
+      } catch (_) {}
     }
   }
 
@@ -92,16 +89,13 @@ class _MapPickerPageState extends State<MapPickerPage> {
       accuracy: LocationAccuracy.best,
       distanceFilter: 10,
     );
-    _posSub = Geolocator.getPositionStream(locationSettings: settings).listen(
-      (pos) {
-        final current = ll.LatLng(pos.latitude, pos.longitude);
-        if (!mounted) return;
-        setState(() => _userLocation = current);
-      },
-      onError: (_) {
-        // Ignore stream errors; map can still work without live updates.
-      },
-    );
+    _posSub = Geolocator.getPositionStream(locationSettings: settings).listen((
+      pos,
+    ) {
+      final current = ll.LatLng(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      setState(() => _userLocation = current);
+    }, onError: (_) {});
   }
 
   void _onTap(ll.LatLng latLng) {
@@ -177,7 +171,6 @@ class _MapPickerPageState extends State<MapPickerPage> {
       final resp = await http.get(
         uri,
         headers: const {
-          // Nominatim requires a valid User-Agent.
           'User-Agent': 'TravelAlarm/1.0 (Flutter; contact: local)',
           'Accept': 'application/json',
         },

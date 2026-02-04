@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-/// Returns distance in meters between two WGS84 coordinates using Haversine.
 double haversineDistanceMeters(
   double startLat,
   double startLng,

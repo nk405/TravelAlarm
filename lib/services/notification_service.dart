@@ -42,14 +42,12 @@ class NotificationService {
         >()
         ?.createNotificationChannel(_channel);
 
-    // Request notification permission on Android 13+
     await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.requestNotificationsPermission();
 
-    // iOS: request permissions (safe no-op on other platforms)
     await _plugin
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
