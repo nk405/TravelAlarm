@@ -117,6 +117,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _monitor = GeofenceMonitor(
       destLat: dest.latitude,
       destLng: dest.longitude,
+      destName: dest.name,
       radiusMeters: _radius,
     );
     final started = await _monitor!.start();

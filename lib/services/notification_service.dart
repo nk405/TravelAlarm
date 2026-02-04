@@ -16,6 +16,16 @@ class NotificationService {
     importance: Importance.high,
   );
 
+  static const AndroidNotificationChannel _monitorChannel =
+      AndroidNotificationChannel(
+        'monitoring_status',
+        'Monitoring Status',
+        description: 'Shows active monitoring status and remaining distance',
+        importance: Importance.low,
+      );
+
+  static const int _monitoringId = 1002;
+
   bool _initialized = false;
 
   Future<void> init() async {
@@ -41,6 +51,12 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(_channel);
+
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(_monitorChannel);
 
     await _plugin
         .resolvePlatformSpecificImplementation<
@@ -77,5 +93,34 @@ class NotificationService {
     );
     final details = NotificationDetails(android: androidDetails);
     await _plugin.show(1001, title, body, details);
+  }
+
+  Future<void> showMonitoringStatus({
+    required String destinationName,
+    required String remainingText,
+  }) async {
+    await init();
+    final androidDetails = AndroidNotificationDetails(
+      _monitorChannel.id,
+      _monitorChannel.name,
+      channelDescription: _monitorChannel.description,
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      onlyAlertOnce: true,
+      showWhen: false,
+    );
+    final details = NotificationDetails(android: androidDetails);
+    await _plugin.show(
+      _monitoringId,
+      'Destination: $destinationName',
+      remainingText,
+      details,
+    );
+  }
+
+  Future<void> cancelMonitoringStatus() async {
+    await init();
+    await _plugin.cancel(_monitoringId);
   }
 }

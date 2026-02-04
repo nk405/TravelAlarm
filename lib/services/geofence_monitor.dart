@@ -13,11 +13,13 @@ class GeofenceMonitor {
   GeofenceMonitor({
     required this.destLat,
     required this.destLng,
+    required this.destName,
     required this.radiusMeters,
   });
 
   double destLat;
   double destLng;
+  String destName;
   double radiusMeters;
 
   StreamSubscription<Position>? _sub;
@@ -26,6 +28,9 @@ class GeofenceMonitor {
   bool _routing = false;
   DateTime? _lastRouteFetch;
   ll.LatLng? _lastRouteFrom;
+
+  DateTime? _lastStatusNotificationAt;
+  double? _lastStatusMeters;
 
   final ValueNotifier<double?> currentDistanceMeters = ValueNotifier<double?>(
     null,
@@ -72,11 +77,17 @@ class GeofenceMonitor {
     _entered = false;
     routePoints.value = const [];
     currentDistanceMeters.value = null;
+    _lastStatusNotificationAt = null;
+    _lastStatusMeters = null;
 
-    final settings = const LocationSettings(
-      accuracy: LocationAccuracy.best,
-      distanceFilter: 10, // meters between updates
+    unawaited(
+      NotificationService.instance.showMonitoringStatus(
+        destinationName: destName,
+        remainingText: 'Awaiting location...',
+      ),
     );
+
+    final settings = _buildLocationSettings();
     _sub?.cancel();
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen(
       (pos) {
@@ -94,6 +105,7 @@ class GeofenceMonitor {
         unawaited(_maybeUpdateRoute(here, fallbackCrowDistanceMeters: dist));
 
         final remaining = currentDistanceMeters.value ?? dist;
+        unawaited(_maybeUpdateMonitoringStatus(remaining));
         final inside = remaining <= radiusMeters;
         if (inside && !_entered) {
           _entered = true;
@@ -120,6 +132,29 @@ class GeofenceMonitor {
     return true;
   }
 
+  Future<void> _maybeUpdateMonitoringStatus(double remainingMeters) async {
+    if (!monitoring.value) return;
+
+    final now = DateTime.now();
+    final lastAt = _lastStatusNotificationAt;
+    final lastMeters = _lastStatusMeters;
+
+    if (lastAt != null && now.difference(lastAt).inSeconds < 20) {
+      if (lastMeters != null && (lastMeters - remainingMeters).abs() < 50) {
+        return;
+      }
+    }
+
+    _lastStatusNotificationAt = now;
+    _lastStatusMeters = remainingMeters;
+
+    await NotificationService.instance.showMonitoringStatus(
+      destinationName: destName,
+      remainingText:
+          'Remaining distance: ${remainingMeters.toStringAsFixed(0)} m',
+    );
+  }
+
   Future<void> _maybeUpdateRoute(
     ll.LatLng from, {
     required double fallbackCrowDistanceMeters,
@@ -129,7 +164,7 @@ class GeofenceMonitor {
 
     final now = DateTime.now();
     final last = _lastRouteFetch;
-    if (last != null && now.difference(last).inSeconds < 15) return;
+    if (last != null && now.difference(last).inSeconds < 30) return;
 
     final lastFrom = _lastRouteFrom;
     if (lastFrom != null) {
@@ -139,7 +174,7 @@ class GeofenceMonitor {
         from.latitude,
         from.longitude,
       );
-      if (moved < 30) return;
+      if (moved < 50) return;
     }
 
     _routing = true;
@@ -155,23 +190,65 @@ class GeofenceMonitor {
           result.distanceMeters > 0
               ? result.distanceMeters
               : fallbackCrowDistanceMeters;
+      final updated = currentDistanceMeters.value;
+      if (updated != null) {
+        unawaited(_maybeUpdateMonitoringStatus(updated));
+      }
     } catch (_) {
       currentDistanceMeters.value = fallbackCrowDistanceMeters;
       routePoints.value = const [];
+      final updated = currentDistanceMeters.value;
+      if (updated != null) {
+        unawaited(_maybeUpdateMonitoringStatus(updated));
+      }
     } finally {
       _routing = false;
     }
+  }
+
+  LocationSettings _buildLocationSettings() {
+    if (kIsWeb) {
+      return const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 25,
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 25,
+        intervalDuration: const Duration(seconds: 10),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'TravelAlarm running',
+          notificationText: 'Monitoring destination in background',
+          enableWakeLock: true,
+          enableWifiLock: false,
+          notificationIcon: AndroidResource(
+            name: 'ic_launcher',
+            defType: 'mipmap',
+          ),
+        ),
+      );
+    }
+
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 25,
+    );
   }
 
   Future<void> stop() async {
     await _sub?.cancel();
     monitoring.value = false;
     await AlarmService.instance.stopAlarm();
+    await NotificationService.instance.cancelMonitoringStatus();
   }
 
   void dispose() {
     _sub?.cancel();
     unawaited(AlarmService.instance.stopAlarm());
+    unawaited(NotificationService.instance.cancelMonitoringStatus());
     currentDistanceMeters.dispose();
     routePoints.dispose();
     currentPosition.dispose();
