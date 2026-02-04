@@ -3,6 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import 'models/destination.dart';
+import 'services/destination_store.dart';
 import 'services/geofence_monitor.dart';
 import 'services/notification_service.dart';
 import 'screens/map_picker_page.dart';
@@ -38,7 +40,9 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   double _radius = 300; // meters
   GeofenceMonitor? _monitor;
-  ll.LatLng? _destination;
+  final List<Destination> _destinations = [];
+  String? _activeDestinationId;
+  bool _loadingDestinations = true;
 
   final MapController _mainMapController = MapController();
   bool _followUserOnMainMap = true;
@@ -48,12 +52,48 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     NotificationService.instance.init();
+    _loadDestinations();
   }
 
   @override
   void dispose() {
     _monitor?.dispose();
     super.dispose();
+  }
+
+  Destination? get _activeDestination {
+    final id = _activeDestinationId;
+    if (id == null) return null;
+    for (final d in _destinations) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  Future<void> _loadDestinations() async {
+    final list = await DestinationStore.instance.loadDestinations();
+    final activeId = await DestinationStore.instance.loadActiveDestinationId();
+    if (!mounted) return;
+    setState(() {
+      _destinations
+        ..clear()
+        ..addAll(list);
+      _activeDestinationId =
+          _destinations.any((d) => d.id == activeId)
+              ? activeId
+              : (_destinations.isNotEmpty ? _destinations.first.id : null);
+      _loadingDestinations = false;
+    });
+    await DestinationStore.instance.saveActiveDestinationId(
+      _activeDestinationId,
+    );
+  }
+
+  Future<void> _persistDestinations() async {
+    await DestinationStore.instance.saveDestinations(_destinations);
+    await DestinationStore.instance.saveActiveDestinationId(
+      _activeDestinationId,
+    );
   }
 
   Future<void> _requestLocationPermission() async {
@@ -64,11 +104,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _startMonitoring() async {
-    final dest = _destination;
+    final dest = _activeDestination;
     if (dest == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pick a destination on the map first')),
+        const SnackBar(content: Text('Select a destination first')),
       );
       return;
     }
@@ -100,45 +140,165 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {});
   }
 
+  Future<void> _setActiveDestination(String? id) async {
+    if (id == _activeDestinationId) return;
+    if (_monitor != null) {
+      await _stopMonitoring();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Monitoring stopped')));
+      }
+    }
+    setState(() => _activeDestinationId = id);
+    await _persistDestinations();
+  }
+
+  Future<String?> _promptDestinationName() async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => const _DestinationNameDialog(),
+    );
+  }
+
+  Future<void> _addDestination() async {
+    final result = await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const MapPickerPage()));
+    if (result == null || result is! ll.LatLng) return;
+    if (!mounted) return;
+
+    final name = await _promptDestinationName();
+    if (name == null) return;
+    final finalName =
+        name.isEmpty ? 'Destination ${_destinations.length + 1}' : name;
+
+    final dest = Destination(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: finalName,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    );
+
+    setState(() {
+      _destinations.add(dest);
+      _activeDestinationId = dest.id;
+    });
+    await _persistDestinations();
+
+    if (_monitor != null) {
+      await _stopMonitoring();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Monitoring stopped')));
+      }
+    }
+  }
+
+  Future<void> _deleteDestination(Destination dest) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Remove destination'),
+          content: Text('Delete "${dest.name}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    if (_monitor != null && _activeDestinationId == dest.id) {
+      await _stopMonitoring();
+    }
+
+    setState(() {
+      _destinations.removeWhere((d) => d.id == dest.id);
+      if (_activeDestinationId == dest.id) {
+        _activeDestinationId =
+            _destinations.isNotEmpty ? _destinations.first.id : null;
+      }
+    });
+    await _persistDestinations();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final active = _activeDestination;
+    final activeLatLng =
+        active == null ? null : ll.LatLng(active.latitude, active.longitude);
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Destination'),
+            const Text('Destinations'),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MapPickerPage()),
-                  );
-                  if (result != null && result is ll.LatLng) {
-                    setState(() => _destination = result);
-                  }
-                },
-                icon: const Icon(Icons.map),
-                label: Text(
-                  _destination == null
-                      ? 'Pick destination on map'
-                      : 'Change destination',
-                ),
+                onPressed: _addDestination,
+                icon: const Icon(Icons.add_location_alt),
+                label: const Text('Add destination'),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              _destination == null
-                  ? 'No destination selected'
-                  : 'Selected: ${_destination!.latitude.toStringAsFixed(6)}, ${_destination!.longitude.toStringAsFixed(6)}',
-            ),
+            if (_loadingDestinations)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_destinations.isEmpty)
+              const Text('No destinations saved')
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _destinations.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final dest = _destinations[i];
+                  return ListTile(
+                    leading: Radio<String>(
+                      value: dest.id,
+                      groupValue: _activeDestinationId,
+                      onChanged: _setActiveDestination,
+                    ),
+                    title: Text(dest.name),
+                    subtitle: Text(
+                      '${dest.latitude.toStringAsFixed(6)}, ${dest.longitude.toStringAsFixed(6)}',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteDestination(dest),
+                    ),
+                    onTap: () => _setActiveDestination(dest.id),
+                  );
+                },
+              ),
+            if (active != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Active: ${active.name} (${active.latitude.toStringAsFixed(6)}, ${active.longitude.toStringAsFixed(6)})',
+              ),
+            ],
             const SizedBox(height: 16),
             Text('Radius: ${_radius.toStringAsFixed(0)} m'),
             Slider(
@@ -154,7 +314,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: _destination == null ? null : _startMonitoring,
+                    onPressed: active == null ? null : _startMonitoring,
                     icon: const Icon(Icons.play_arrow),
                     label: const Text('Start'),
                   ),
@@ -228,10 +388,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             mapController: _mainMapController,
                             options: MapOptions(
                               initialCenter:
-                                  _destination ?? const ll.LatLng(0, 0),
+                                  activeLatLng ?? const ll.LatLng(0, 0),
                               initialZoom: _mainMapZoom,
                               onPositionChanged: (pos, hasGesture) {
-                                // Track zoom so following keeps the user's chosen zoom.
                                 if (!hasGesture) return;
                                 final zoom = pos.zoom;
                                 if (zoom == null) return;
@@ -266,11 +425,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                   );
                                 },
                               ),
-                              if (_destination != null)
+                              if (activeLatLng != null)
                                 MarkerLayer(
                                   markers: [
                                     Marker(
-                                      point: _destination!,
+                                      point: activeLatLng,
                                       width: 40,
                                       height: 40,
                                       child: const Icon(
@@ -367,10 +526,49 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
               ),
-            const Spacer(),
+            const SizedBox(height: 16),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DestinationNameDialog extends StatefulWidget {
+  const _DestinationNameDialog();
+
+  @override
+  State<_DestinationNameDialog> createState() => _DestinationNameDialogState();
+}
+
+class _DestinationNameDialogState extends State<_DestinationNameDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Destination name'),
+      content: TextField(
+        controller: _controller,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(hintText: 'e.g. Office'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
