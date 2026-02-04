@@ -248,8 +248,6 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Destinations'),
-            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
@@ -258,47 +256,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 label: const Text('Add destination'),
               ),
             ),
-            const SizedBox(height: 8),
-            if (_loadingDestinations)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_destinations.isEmpty)
-              const Text('No destinations saved')
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _destinations.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, i) {
-                  final dest = _destinations[i];
-                  return ListTile(
-                    leading: Radio<String>(
-                      value: dest.id,
-                      groupValue: _activeDestinationId,
-                      onChanged: _setActiveDestination,
-                    ),
-                    title: Text(dest.name),
-                    subtitle: Text(
-                      '${dest.latitude.toStringAsFixed(6)}, ${dest.longitude.toStringAsFixed(6)}',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Delete',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _deleteDestination(dest),
-                    ),
-                    onTap: () => _setActiveDestination(dest.id),
-                  );
-                },
-              ),
-            if (active != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Active: ${active.name} (${active.latitude.toStringAsFixed(6)}, ${active.longitude.toStringAsFixed(6)})',
-              ),
-            ],
             const SizedBox(height: 16),
             Text('Radius: ${_radius.toStringAsFixed(0)} m'),
             Slider(
@@ -523,6 +480,49 @@ class _MyHomePageState extends State<MyHomePage> {
                         ],
                       ),
                     ),
+                  );
+                },
+              ),
+            const SizedBox(height: 16),
+            const Text('Saved destinations'),
+            const SizedBox(height: 8),
+            if (active != null) ...[
+              Text(
+                'Active: ${active.name} (${active.latitude.toStringAsFixed(6)}, ${active.longitude.toStringAsFixed(6)})',
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (_loadingDestinations)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_destinations.isEmpty)
+              const Text('No destinations saved')
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _destinations.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final dest = _destinations[i];
+                  return ListTile(
+                    leading: Radio<String>(
+                      value: dest.id,
+                      groupValue: _activeDestinationId,
+                      onChanged: _setActiveDestination,
+                    ),
+                    title: Text(dest.name),
+                    subtitle: Text(
+                      '${dest.latitude.toStringAsFixed(6)}, ${dest.longitude.toStringAsFixed(6)}',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteDestination(dest),
+                    ),
+                    onTap: () => _setActiveDestination(dest.id),
                   );
                 },
               ),
