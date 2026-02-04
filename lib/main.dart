@@ -21,7 +21,22 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'TravelAlarm',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF246A73),
+          onPrimary: Color(0xFFF3DFC1),
+          secondary: Color(0xFF368F8B),
+          onSecondary: Color(0xFFF3DFC1),
+          tertiary: Color(0xFF160F29),
+          onTertiary: Color(0xFFF3DFC1),
+          surface: Color(0xFFF3DFC1),
+          onSurface: Color(0xFF160F29),
+          background: Color(0xFFF3DFC1),
+          onBackground: Color(0xFF160F29),
+          outline: Color(0xFF368F8B),
+          outlineVariant: Color(0xFFDDBeA8),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF3DFC1),
       ),
       home: const MyHomePage(title: 'TravelAlarm'),
     );
@@ -238,10 +253,15 @@ class _MyHomePageState extends State<MyHomePage> {
     final active = _activeDestination;
     final activeLatLng =
         active == null ? null : ll.LatLng(active.latitude, active.longitude);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: colors.background,
+        surfaceTintColor: colors.background,
+        elevation: 0,
+        centerTitle: true,
         title: Text(widget.title),
       ),
       body: SingleChildScrollView(
@@ -249,289 +269,347 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: _addDestination,
-                icon: const Icon(Icons.add_location_alt),
-                label: const Text('Add destination'),
+            _Section(
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _addDestination,
+                  icon: const Icon(Icons.add_location_alt),
+                  label: const Text('Add destination'),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text('Radius: ${_radius.toStringAsFixed(0)} m'),
-            Slider(
-              value: _radius,
-              min: 50,
-              max: 2000,
-              divisions: 39,
-              label: '${_radius.toStringAsFixed(0)} m',
-              onChanged: (v) => setState(() => _radius = v),
-            ),
-            const SizedBox(height: 8),
-            if (_monitor == null)
-              Row(
+            _Section(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: active == null ? null : _startMonitoring,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start'),
+                  Text(
+                    'Radius',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop'),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_radius.toStringAsFixed(0)} m',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Slider(
+                    value: _radius,
+                    min: 50,
+                    max: 2000,
+                    divisions: 39,
+                    label: '${_radius.toStringAsFixed(0)} m',
+                    onChanged: (v) => setState(() => _radius = v),
                   ),
                 ],
-              )
-            else
-              ValueListenableBuilder<bool>(
-                valueListenable: _monitor!.monitoring,
-                builder: (context, running, _) {
-                  return Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: running ? null : _startMonitoring,
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Start'),
-                      ),
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: running ? _stopMonitoring : null,
-                        icon: const Icon(Icons.stop),
-                        label: const Text('Stop'),
-                      ),
-                    ],
-                  );
-                },
               ),
-            const SizedBox(height: 16),
-            if (_monitor != null)
-              ValueListenableBuilder<double?>(
-                valueListenable: _monitor!.currentDistanceMeters,
-                builder: (context, dist, _) {
-                  final text =
-                      dist == null
-                          ? 'Awaiting location...'
-                          : 'Remaining distance (driving): ${dist.toStringAsFixed(0)} m';
-                  return Text(
-                    text,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  );
-                },
-              ),
-            if (_monitor != null)
-              ValueListenableBuilder<bool>(
-                valueListenable: _monitor!.monitoring,
-                builder:
-                    (context, running, _) => Text(
-                      running ? 'Monitoring active' : 'Monitoring stopped',
-                      style: TextStyle(
-                        color: running ? Colors.green : Colors.red,
+            ),
+            _Section(
+              child:
+                  _monitor == null
+                      ? Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed:
+                                  active == null ? null : _startMonitoring,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.stop),
+                              label: const Text('Stop'),
+                            ),
+                          ),
+                        ],
+                      )
+                      : ValueListenableBuilder<bool>(
+                        valueListenable: _monitor!.monitoring,
+                        builder: (context, running, _) {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: running ? null : _startMonitoring,
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: const Text('Start'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: running ? _stopMonitoring : null,
+                                  icon: const Icon(Icons.stop),
+                                  label: const Text('Stop'),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                    ),
+            ),
+            if (_monitor != null)
+              _Section(
+                child: ValueListenableBuilder<double?>(
+                  valueListenable: _monitor!.currentDistanceMeters,
+                  builder: (context, dist, _) {
+                    final text =
+                        dist == null
+                            ? 'Awaiting location...'
+                            : 'Remaining distance: ${dist.toStringAsFixed(0)} m';
+                    return Row(
+                      children: [
+                        Icon(Icons.directions, color: colors.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(text, style: theme.textTheme.titleMedium),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             if (_monitor != null)
               ValueListenableBuilder<bool>(
                 valueListenable: _monitor!.monitoring,
                 builder: (context, running, _) {
                   if (!running) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: SizedBox(
-                      height: 260,
-                      child: Stack(
-                        children: [
-                          FlutterMap(
-                            mapController: _mainMapController,
-                            options: MapOptions(
-                              initialCenter:
-                                  activeLatLng ?? const ll.LatLng(0, 0),
-                              initialZoom: _mainMapZoom,
-                              onPositionChanged: (pos, hasGesture) {
-                                if (!hasGesture) return;
-                                final zoom = pos.zoom;
-                                if (zoom == null) return;
-                                _mainMapZoom = zoom;
-                              },
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate:
-                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                userAgentPackageName:
-                                    'com.travelalarm.travelalarm',
-                                subdomains: const [],
-                              ),
-                              ValueListenableBuilder<List<ll.LatLng>>(
-                                valueListenable: _monitor!.routePoints,
-                                builder: (context, pts, _) {
-                                  if (pts.isEmpty) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return PolylineLayer(
-                                    polylines: [
-                                      Polyline(
-                                        points: pts,
-                                        strokeWidth: 5,
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                  return _Section(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Map',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: SizedBox(
+                            height: 260,
+                            child: Stack(
+                              children: [
+                                FlutterMap(
+                                  mapController: _mainMapController,
+                                  options: MapOptions(
+                                    initialCenter:
+                                        activeLatLng ?? const ll.LatLng(0, 0),
+                                    initialZoom: _mainMapZoom,
+                                    onPositionChanged: (pos, hasGesture) {
+                                      if (!hasGesture) return;
+                                      final zoom = pos.zoom;
+                                      if (zoom == null) return;
+                                      _mainMapZoom = zoom;
+                                    },
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      userAgentPackageName:
+                                          'com.travelalarm.travelalarm',
+                                      subdomains: const [],
+                                    ),
+                                    ValueListenableBuilder<List<ll.LatLng>>(
+                                      valueListenable: _monitor!.routePoints,
+                                      builder: (context, pts, _) {
+                                        if (pts.isEmpty) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return PolylineLayer(
+                                          polylines: [
+                                            Polyline(
+                                              points: pts,
+                                              strokeWidth: 5,
+                                              color: colors.primary,
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                    if (activeLatLng != null)
+                                      MarkerLayer(
+                                        markers: [
+                                          Marker(
+                                            point: activeLatLng,
+                                            width: 40,
+                                            height: 40,
+                                            child: const Icon(
+                                              Icons.place,
+                                              color: Colors.red,
+                                              size: 36,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  );
-                                },
-                              ),
-                              if (activeLatLng != null)
-                                MarkerLayer(
-                                  markers: [
-                                    Marker(
-                                      point: activeLatLng,
-                                      width: 40,
-                                      height: 40,
-                                      child: const Icon(
-                                        Icons.place,
-                                        color: Colors.red,
-                                        size: 36,
-                                      ),
+                                    ValueListenableBuilder<ll.LatLng?>(
+                                      valueListenable:
+                                          _monitor!.currentPosition,
+                                      builder: (context, pos, _) {
+                                        if (pos == null) {
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        if (_followUserOnMainMap) {
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                                if (!mounted) return;
+                                                _mainMapController.move(
+                                                  pos,
+                                                  _mainMapZoom,
+                                                );
+                                              });
+                                        }
+
+                                        return MarkerLayer(
+                                          markers: [
+                                            Marker(
+                                              point: pos,
+                                              width: 20,
+                                              height: 20,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: colors.primary,
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),
-                              ValueListenableBuilder<ll.LatLng?>(
-                                valueListenable: _monitor!.currentPosition,
-                                builder: (context, pos, _) {
-                                  if (pos == null) {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  if (_followUserOnMainMap) {
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (!mounted) return;
-                                          _mainMapController.move(
-                                            pos,
-                                            _mainMapZoom,
-                                          );
-                                        });
-                                  }
-
-                                  return MarkerLayer(
-                                    markers: [
-                                      Marker(
-                                        point: pos,
-                                        width: 20,
-                                        height: 20,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color:
-                                                Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                            border: Border.all(
-                                              color: Colors.white,
-                                              width: 3,
-                                            ),
-                                          ),
-                                        ),
+                                Positioned(
+                                  top: 10,
+                                  right: 10,
+                                  child: Material(
+                                    color: colors.surface,
+                                    shape: const CircleBorder(),
+                                    elevation: 2,
+                                    child: IconButton(
+                                      tooltip:
+                                          _followUserOnMainMap
+                                              ? 'Following location'
+                                              : 'Follow location',
+                                      icon: Icon(
+                                        _followUserOnMainMap
+                                            ? Icons.my_location
+                                            : Icons.location_searching,
                                       ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          Positioned(
-                            top: 10,
-                            right: 10,
-                            child: Material(
-                              color: Theme.of(context).colorScheme.surface,
-                              shape: const CircleBorder(),
-                              elevation: 2,
-                              child: IconButton(
-                                tooltip:
-                                    _followUserOnMainMap
-                                        ? 'Following location'
-                                        : 'Follow location',
-                                icon: Icon(
-                                  _followUserOnMainMap
-                                      ? Icons.my_location
-                                      : Icons.location_searching,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _followUserOnMainMap =
-                                        !_followUserOnMainMap;
-                                  });
+                                      onPressed: () {
+                                        setState(() {
+                                          _followUserOnMainMap =
+                                              !_followUserOnMainMap;
+                                        });
 
-                                  if (_followUserOnMainMap) {
-                                    final pos = _monitor!.currentPosition.value;
-                                    if (pos != null) {
-                                      _mainMapController.move(
-                                        pos,
-                                        _mainMapZoom,
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
+                                        if (_followUserOnMainMap) {
+                                          final pos =
+                                              _monitor!.currentPosition.value;
+                                          if (pos != null) {
+                                            _mainMapController.move(
+                                              pos,
+                                              _mainMapZoom,
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   );
                 },
               ),
-            const SizedBox(height: 16),
-            const Text('Saved destinations'),
-            const SizedBox(height: 8),
-            if (active != null) ...[
-              Text(
-                'Active: ${active.name} (${active.latitude.toStringAsFixed(6)}, ${active.longitude.toStringAsFixed(6)})',
+            _Section(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Saved destinations',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (active != null) ...[
+                    Text(
+                      'Active: ${active.name} (${active.latitude.toStringAsFixed(6)}, ${active.longitude.toStringAsFixed(6)})',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (_loadingDestinations)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_destinations.isEmpty)
+                    const Text('No destinations saved')
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _destinations.length,
+                      separatorBuilder:
+                          (_, __) =>
+                              Divider(height: 1, color: colors.outlineVariant),
+                      itemBuilder: (context, i) {
+                        final dest = _destinations[i];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Radio<String>(
+                            value: dest.id,
+                            groupValue: _activeDestinationId,
+                            onChanged: _setActiveDestination,
+                          ),
+                          title: Text(dest.name),
+                          subtitle: Text(
+                            '${dest.latitude.toStringAsFixed(6)}, ${dest.longitude.toStringAsFixed(6)}',
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Delete',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _deleteDestination(dest),
+                          ),
+                          onTap: () => _setActiveDestination(dest.id),
+                        );
+                      },
+                    ),
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
-            if (_loadingDestinations)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_destinations.isEmpty)
-              const Text('No destinations saved')
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _destinations.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, i) {
-                  final dest = _destinations[i];
-                  return ListTile(
-                    leading: Radio<String>(
-                      value: dest.id,
-                      groupValue: _activeDestinationId,
-                      onChanged: _setActiveDestination,
-                    ),
-                    title: Text(dest.name),
-                    subtitle: Text(
-                      '${dest.latitude.toStringAsFixed(6)}, ${dest.longitude.toStringAsFixed(6)}',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Delete',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _deleteDestination(dest),
-                    ),
-                    onTap: () => _setActiveDestination(dest.id),
-                  );
-                },
-              ),
-            const SizedBox(height: 16),
+            ),
           ],
         ),
       ),
     );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(padding: const EdgeInsets.only(bottom: 16), child: child);
   }
 }
 
