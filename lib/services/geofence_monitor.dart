@@ -112,7 +112,7 @@ class GeofenceMonitor {
           NotificationService.instance.showProximityAlert(
             title: 'Approaching destination',
             body:
-                'You are ${(remaining).toStringAsFixed(0)} m from your destination.',
+                'You are ${_formatDistance(remaining)} from your destination.',
           );
           AlarmService.instance.startAlarm();
         }
@@ -150,9 +150,16 @@ class GeofenceMonitor {
 
     await NotificationService.instance.showMonitoringStatus(
       destinationName: destName,
-      remainingText:
-          'Remaining distance: ${remainingMeters.toStringAsFixed(0)} m',
+      remainingText: 'Remaining distance: ${_formatDistance(remainingMeters)}',
     );
+  }
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) {
+      final km = meters / 1000;
+      return '${km.toStringAsFixed(1)} km';
+    }
+    return '${meters.toStringAsFixed(0)} m';
   }
 
   Future<void> _maybeUpdateRoute(

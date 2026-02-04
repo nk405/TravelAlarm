@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -55,6 +56,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   double _radius = 300; // meters
   GeofenceMonitor? _monitor;
+  late final TextEditingController _radiusController;
   final List<Destination> _destinations = [];
   String? _activeDestinationId;
   bool _loadingDestinations = true;
@@ -66,6 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    _radiusController = TextEditingController(text: _radius.toStringAsFixed(0));
     NotificationService.instance.init();
     _loadDestinations();
   }
@@ -73,7 +76,20 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _monitor?.dispose();
+    _radiusController.dispose();
     super.dispose();
+  }
+
+  void _applyRadiusInput(String value) {
+    final parsed = double.tryParse(value);
+    if (parsed == null) return;
+    final clamped = parsed.clamp(50, 2000).toDouble();
+    setState(() => _radius = clamped);
+    _radiusController.text = clamped.toStringAsFixed(0);
+    _radiusController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _radiusController.text.length),
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   Destination? get _activeDestination {
@@ -284,23 +300,38 @@ class _MyHomePageState extends State<MyHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Radius',
+                    'Alert distance (meters)',
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    '${_radius.toStringAsFixed(0)} m',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  Slider(
-                    value: _radius,
-                    min: 50,
-                    max: 2000,
-                    divisions: 39,
-                    label: '${_radius.toStringAsFixed(0)} m',
-                    onChanged: (v) => setState(() => _radius = v),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _radiusController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            hintText: 'Enter radius',
+                            suffixText: 'm',
+                          ),
+                          onSubmitted: _applyRadiusInput,
+                          onEditingComplete:
+                              () => _applyRadiusInput(_radiusController.text),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Min 50 • Max 2000',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -361,7 +392,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     final text =
                         dist == null
                             ? 'Awaiting location...'
-                            : 'Remaining distance: ${dist.toStringAsFixed(0)} m';
+                            : 'Remaining distance: ${_formatDistance(dist)}';
                     return Row(
                       children: [
                         Icon(Icons.directions, color: colors.primary),
@@ -599,6 +630,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
+  }
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) {
+      final km = meters / 1000;
+      return '${km.toStringAsFixed(1)} km';
+    }
+    return '${meters.toStringAsFixed(0)} m';
   }
 }
 
