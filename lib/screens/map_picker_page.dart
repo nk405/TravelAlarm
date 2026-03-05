@@ -232,15 +232,13 @@ class _MapPickerPageState extends State<MapPickerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: colors.surface,
+        surfaceTintColor: colors.surface,
+        elevation: 0,
         title: const Text('Pick destination'),
-        actions: [
-          TextButton(
-            onPressed: _confirm,
-            child: const Text('OK', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
       body: Stack(
         children: [
@@ -308,19 +306,22 @@ class _MapPickerPageState extends State<MapPickerPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Material(
-                    elevation: 2,
-                    borderRadius: BorderRadius.circular(10),
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(14),
+                    color: colors.surface,
+                    shadowColor: Colors.black38,
                     child: TextField(
                       controller: _searchController,
                       textInputAction: TextInputAction.search,
                       onChanged: (_) => setState(() {}),
                       onSubmitted: _searchPlace,
                       decoration: InputDecoration(
-                        hintText: 'Search a place',
+                        hintText: 'Search a place...',
+                        hintStyle: TextStyle(color: colors.onSurfaceVariant),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
+                          horizontal: 16,
+                          vertical: 14,
                         ),
                         prefixIcon:
                             _searching
@@ -338,7 +339,10 @@ class _MapPickerPageState extends State<MapPickerPage> {
                                   onPressed:
                                       () =>
                                           _searchPlace(_searchController.text),
-                                  icon: const Icon(Icons.search),
+                                  icon: Icon(
+                                    Icons.search,
+                                    color: colors.primary,
+                                  ),
                                 ),
                         suffixIcon:
                             _searchController.text.isEmpty
@@ -360,36 +364,69 @@ class _MapPickerPageState extends State<MapPickerPage> {
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(10),
+                        color: colors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colors.outlineVariant.withOpacity(0.4),
+                        ),
                       ),
-                      child: Text(_searchError!),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _searchError!,
+                              style: TextStyle(color: colors.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                   if (_results.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Material(
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(10),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 240),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: _results.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final r = _results[i];
-                            return ListTile(
-                              title: Text(
-                                r.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () => _selectResult(r),
-                            );
-                          },
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(14),
+                      color: colors.surface,
+                      shadowColor: Colors.black38,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 240),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: _results.length,
+                            separatorBuilder:
+                                (_, __) => Divider(
+                                  height: 1,
+                                  color: colors.outlineVariant.withOpacity(0.3),
+                                ),
+                            itemBuilder: (context, i) {
+                              final r = _results[i];
+                              return ListTile(
+                                leading: Icon(
+                                  Icons.place_outlined,
+                                  color: colors.primary,
+                                  size: 20,
+                                ),
+                                title: Text(
+                                  r.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                onTap: () => _selectResult(r),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -401,36 +438,67 @@ class _MapPickerPageState extends State<MapPickerPage> {
         ],
       ),
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
+        child: Container(
+          margin: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.outlineVariant.withOpacity(0.4)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _selected == null
-                    ? 'Tap on the map to select a destination'
-                    : 'Selected: ${_selected!.latitude.toStringAsFixed(6)}, ${_selected!.longitude.toStringAsFixed(6)}',
-                textAlign: TextAlign.center,
+              Row(
+                children: [
+                  Icon(
+                    _selected == null ? Icons.touch_app_outlined : Icons.place,
+                    color:
+                        _selected == null
+                            ? colors.onSurfaceVariant
+                            : colors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _selected == null
+                          ? 'Tap on the map to select a destination'
+                          : '${_selected!.latitude.toStringAsFixed(5)}, ${_selected!.longitude.toStringAsFixed(5)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color:
+                            _selected == null
+                                ? colors.onSurfaceVariant
+                                : colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               if (_selected != null && (_routing || _routeError != null)) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
-                  _routing ? 'Fetching route…' : _routeError!,
+                  _routing ? 'Fetching route...' : _routeError!,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color:
-                        _routing
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Theme.of(context).colorScheme.error,
+                    color: _routing ? colors.onSurface : colors.error,
+                    fontSize: 13,
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                height: 48,
+                child: FilledButton.icon(
                   onPressed: _selected == null ? null : _confirm,
-                  child: const Text('Confirm location'),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Confirm location'),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ),
             ],
