@@ -366,11 +366,9 @@ class _MapPickerPageState extends State<MapPickerPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: colors.surface,
+                        color: colors.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colors.outlineVariant.withOpacity(0.4),
-                        ),
+                        border: Border.all(color: colors.outlineVariant),
                       ),
                       child: Row(
                         children: [
@@ -407,7 +405,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
                             separatorBuilder:
                                 (_, __) => Divider(
                                   height: 1,
-                                  color: colors.outlineVariant.withOpacity(0.3),
+                                  color: colors.outlineVariant,
                                 ),
                             itemBuilder: (context, i) {
                               final r = _results[i];
@@ -442,9 +440,9 @@ class _MapPickerPageState extends State<MapPickerPage> {
           margin: const EdgeInsets.all(12.0),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: colors.surface,
+            color: colors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colors.outlineVariant.withOpacity(0.4)),
+            border: Border.all(color: colors.outlineVariant),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

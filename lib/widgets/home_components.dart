@@ -14,9 +14,9 @@ class CardSection extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: gradient,
-        color: gradient == null ? colors.surface : null,
+        color: gradient == null ? colors.surfaceContainerLow : null,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: child,
     );
@@ -187,7 +187,9 @@ class _PulsingDotState extends State<PulsingDot>
                 height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: widget.color.withOpacity(1.0 - _ctrl.value * 0.5),
+                  color: widget.color.withValues(
+                    alpha: 1.0 - _ctrl.value * 0.5,
+                  ),
                 ),
               ),
             ),

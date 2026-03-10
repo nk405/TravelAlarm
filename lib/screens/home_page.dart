@@ -300,7 +300,7 @@ class _MyHomePageState extends State<MyHomePage> {
               // --- Hero status card ---
               CardSection(
                 gradient: LinearGradient(
-                  colors: [colors.primary.withOpacity(0.15), colors.surface],
+                  colors: [colors.primaryContainer, colors.surfaceContainerLow],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -310,12 +310,12 @@ class _MyHomePageState extends State<MyHomePage> {
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: colors.primary.withOpacity(0.15),
+                        color: colors.primaryContainer,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
                         Icons.travel_explore,
-                        color: colors.primary,
+                        color: colors.onPrimaryContainer,
                         size: 28,
                       ),
                     ),
@@ -373,7 +373,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: colors.primary.withOpacity(0.12),
+                            color: colors.secondaryContainer,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -532,7 +532,10 @@ class _MyHomePageState extends State<MyHomePage> {
               if (_monitor != null)
                 CardSection(
                   gradient: LinearGradient(
-                    colors: [colors.primary.withOpacity(0.08), colors.surface],
+                    colors: [
+                      colors.tertiaryContainer,
+                      colors.surfaceContainerLow,
+                    ],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -544,12 +547,12 @@ class _MyHomePageState extends State<MyHomePage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.12),
+                              color: colors.tertiaryContainer,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               Icons.straighten,
-                              color: colors.primary,
+                              color: colors.onTertiaryContainer,
                               size: 22,
                             ),
                           ),
@@ -864,19 +867,19 @@ class _MyHomePageState extends State<MyHomePage> {
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 20),
                               decoration: BoxDecoration(
-                                color: colors.error.withOpacity(0.15),
+                                color: colors.errorContainer,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Icon(
                                 Icons.delete_outline,
-                                color: colors.error,
+                                color: colors.onErrorContainer,
                               ),
                             ),
                             child: Material(
                               color:
                                   isActive
-                                      ? colors.primary.withOpacity(0.08)
-                                      : colors.outlineVariant.withOpacity(0.15),
+                                      ? colors.primaryContainer
+                                      : colors.surfaceContainerLow,
                               borderRadius: BorderRadius.circular(14),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
@@ -896,11 +899,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                         decoration: BoxDecoration(
                                           color:
                                               isActive
-                                                  ? colors.primary.withOpacity(
-                                                    0.15,
-                                                  )
-                                                  : colors.outlineVariant
-                                                      .withOpacity(0.25),
+                                                  ? colors.primaryContainer
+                                                  : colors
+                                                      .surfaceContainerHighest,
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
@@ -911,8 +912,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                               : Icons.place_outlined,
                                           color:
                                               isActive
-                                                  ? colors.primary
-                                                  : colors.outline,
+                                                  ? colors.onPrimaryContainer
+                                                  : colors.onSurfaceVariant,
                                           size: 22,
                                         ),
                                       ),
