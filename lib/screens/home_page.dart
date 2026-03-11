@@ -21,6 +21,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   double _radius = 300; // meters
+  bool _useAdaptiveRadius = true;
   GeofenceMonitor? _monitor;
   final List<Destination> _destinations = [];
   String? _activeDestinationId;
@@ -46,6 +47,13 @@ class _MyHomePageState extends State<MyHomePage> {
   void _setRadius(double value) {
     final clamped = value.clamp(50, 2000).toDouble();
     setState(() => _radius = clamped);
+    _monitor?.setBaseRadius(clamped);
+  }
+
+  Future<void> _setAdaptiveRadius(bool value) async {
+    setState(() => _useAdaptiveRadius = value);
+    _monitor?.setAdaptiveRadiusEnabled(value);
+    await DestinationStore.instance.saveAdaptiveRadiusEnabled(value);
   }
 
   Destination? get _activeDestination {
@@ -60,11 +68,14 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _loadDestinations() async {
     final list = await DestinationStore.instance.loadDestinations();
     final activeId = await DestinationStore.instance.loadActiveDestinationId();
+    final adaptiveRadiusEnabled =
+        await DestinationStore.instance.loadAdaptiveRadiusEnabled();
     if (!mounted) return;
     setState(() {
       _destinations
         ..clear()
         ..addAll(list);
+      _useAdaptiveRadius = adaptiveRadiusEnabled;
       _activeDestinationId =
           _destinations.any((d) => d.id == activeId)
               ? activeId
@@ -106,6 +117,7 @@ class _MyHomePageState extends State<MyHomePage> {
       destLng: dest.longitude,
       destName: dest.name,
       radiusMeters: _radius,
+      adaptiveRadiusEnabled: _useAdaptiveRadius,
     );
     final started = await _monitor!.start();
     if (!started) {
@@ -377,7 +389,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_radius.toStringAsFixed(0)} m',
+                            _buildRadiusBadgeLabel(),
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: colors.primary,
                               fontWeight: FontWeight.bold,
@@ -385,6 +397,21 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _useAdaptiveRadius,
+                      onChanged: _setAdaptiveRadius,
+                      title: const Text('Auto-adjust by speed'),
+                      subtitle: Text(
+                        _useAdaptiveRadius
+                            ? 'Uses live speed to increase the alert radius before arrival.'
+                            : 'Uses only the fixed distance you set below.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SliderTheme(
@@ -405,11 +432,23 @@ class _MyHomePageState extends State<MyHomePage> {
                         max: 2000,
                         divisions: 39,
                         value: _radius,
-                        label: '${_radius.toStringAsFixed(0)} m',
+                        label:
+                            _useAdaptiveRadius
+                                ? 'Base ${_radius.toStringAsFixed(0)} m'
+                                : '${_radius.toStringAsFixed(0)} m',
                         onChanged: _setRadius,
                       ),
                     ),
                     const SizedBox(height: 4),
+                    Text(
+                      _useAdaptiveRadius
+                          ? 'Base distance used by the predictor. The live alert radius grows with speed.'
+                          : 'Fixed alert distance before the alarm triggers.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       children: [
@@ -433,6 +472,47 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                       ],
                     ),
+                    if (_monitor != null && _useAdaptiveRadius) ...[
+                      const SizedBox(height: 12),
+                      ValueListenableBuilder<double>(
+                        valueListenable: _monitor!.effectiveRadiusMeters,
+                        builder: (context, effectiveRadius, _) {
+                          return ValueListenableBuilder<double>(
+                            valueListenable:
+                                _monitor!.currentSpeedMetersPerSecond,
+                            builder: (context, speed, __) {
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: colors.outlineVariant,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.auto_awesome,
+                                      size: 18,
+                                      color: colors.primary,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Live radius ${_formatDistance(effectiveRadius)} at ${_formatSpeed(speed)}',
+                                        style: theme.textTheme.bodyMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -988,5 +1068,24 @@ class _MyHomePageState extends State<MyHomePage> {
       return '${km.toStringAsFixed(1)} km';
     }
     return '${meters.toStringAsFixed(0)} m';
+  }
+
+  String _formatSpeed(double speedMetersPerSecond) {
+    final speedKmh = speedMetersPerSecond * 3.6;
+    return '${speedKmh.toStringAsFixed(0)} km/h';
+  }
+
+  String _buildRadiusBadgeLabel() {
+    final monitor = _monitor;
+    if (!_useAdaptiveRadius || monitor == null) {
+      return '${_radius.toStringAsFixed(0)} m';
+    }
+
+    final effectiveRadius = monitor.effectiveRadiusMeters.value;
+    if (effectiveRadius <= 0) {
+      return 'Base ${_radius.toStringAsFixed(0)} m';
+    }
+
+    return 'Auto ${effectiveRadius.toStringAsFixed(0)} m';
   }
 }

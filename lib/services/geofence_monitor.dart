@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' as ll;
 import '../services/notification_service.dart';
 import '../services/alarm_service.dart';
 import '../services/route_service.dart';
+import '../utils/adaptive_alert_distance.dart';
 import '../utils/distance.dart';
 
 class GeofenceMonitor {
@@ -15,12 +16,14 @@ class GeofenceMonitor {
     required this.destLng,
     required this.destName,
     required this.radiusMeters,
+    this.adaptiveRadiusEnabled = false,
   });
 
   double destLat;
   double destLng;
   String destName;
   double radiusMeters;
+  bool adaptiveRadiusEnabled;
 
   StreamSubscription<Position>? _sub;
   bool _entered = false;
@@ -31,10 +34,16 @@ class GeofenceMonitor {
 
   DateTime? _lastStatusNotificationAt;
   double? _lastStatusMeters;
+  double _smoothedSpeedMetersPerSecond = 0;
 
   final ValueNotifier<double?> currentDistanceMeters = ValueNotifier<double?>(
     null,
   );
+
+  final ValueNotifier<double> currentSpeedMetersPerSecond =
+      ValueNotifier<double>(0);
+
+  final ValueNotifier<double> effectiveRadiusMeters = ValueNotifier<double>(0);
 
   final ValueNotifier<List<ll.LatLng>> routePoints =
       ValueNotifier<List<ll.LatLng>>(const []);
@@ -44,6 +53,16 @@ class GeofenceMonitor {
   );
 
   final ValueNotifier<bool> monitoring = ValueNotifier<bool>(false);
+
+  void setBaseRadius(double value) {
+    radiusMeters = value.clamp(50, 2000).toDouble();
+    _updateEffectiveRadius();
+  }
+
+  void setAdaptiveRadiusEnabled(bool value) {
+    adaptiveRadiusEnabled = value;
+    _updateEffectiveRadius();
+  }
 
   Future<LocationPermission> ensurePermission() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -77,8 +96,11 @@ class GeofenceMonitor {
     _entered = false;
     routePoints.value = const [];
     currentDistanceMeters.value = null;
+    currentSpeedMetersPerSecond.value = 0;
+    _smoothedSpeedMetersPerSecond = 0;
     _lastStatusNotificationAt = null;
     _lastStatusMeters = null;
+    _updateEffectiveRadius();
 
     unawaited(
       NotificationService.instance.showMonitoringStatus(
@@ -93,6 +115,7 @@ class GeofenceMonitor {
       (pos) {
         final here = ll.LatLng(pos.latitude, pos.longitude);
         currentPosition.value = here;
+        _updateSpeed(pos.speed);
 
         final dist = haversineDistanceMeters(
           pos.latitude,
@@ -106,7 +129,7 @@ class GeofenceMonitor {
 
         final remaining = currentDistanceMeters.value ?? dist;
         unawaited(_maybeUpdateMonitoringStatus(remaining));
-        final inside = remaining <= radiusMeters;
+        final inside = remaining <= effectiveRadiusMeters.value;
         if (inside && !_entered) {
           _entered = true;
           NotificationService.instance.showProximityAlert(
@@ -130,6 +153,27 @@ class GeofenceMonitor {
     );
 
     return true;
+  }
+
+  void _updateSpeed(double speedMetersPerSecond) {
+    final rawSpeed =
+        speedMetersPerSecond.isFinite
+            ? speedMetersPerSecond.clamp(0, 60).toDouble()
+            : 0.0;
+    _smoothedSpeedMetersPerSecond =
+        (_smoothedSpeedMetersPerSecond * 0.7) + (rawSpeed * 0.3);
+    currentSpeedMetersPerSecond.value = _smoothedSpeedMetersPerSecond;
+    _updateEffectiveRadius();
+  }
+
+  void _updateEffectiveRadius() {
+    effectiveRadiusMeters.value =
+        adaptiveRadiusEnabled
+            ? computeAdaptiveAlertRadius(
+              baseRadiusMeters: radiusMeters,
+              speedMetersPerSecond: _smoothedSpeedMetersPerSecond,
+            )
+            : radiusMeters;
   }
 
   Future<void> _maybeUpdateMonitoringStatus(double remainingMeters) async {
@@ -248,6 +292,9 @@ class GeofenceMonitor {
   Future<void> stop() async {
     await _sub?.cancel();
     monitoring.value = false;
+    currentSpeedMetersPerSecond.value = 0;
+    _smoothedSpeedMetersPerSecond = 0;
+    _updateEffectiveRadius();
     await AlarmService.instance.stopAlarm();
     await NotificationService.instance.cancelMonitoringStatus();
   }
@@ -257,6 +304,8 @@ class GeofenceMonitor {
     unawaited(AlarmService.instance.stopAlarm());
     unawaited(NotificationService.instance.cancelMonitoringStatus());
     currentDistanceMeters.dispose();
+    currentSpeedMetersPerSecond.dispose();
+    effectiveRadiusMeters.dispose();
     routePoints.dispose();
     currentPosition.dispose();
     monitoring.dispose();

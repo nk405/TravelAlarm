@@ -5,12 +5,12 @@ import 'package:travelalarm/main.dart';
 void main() {
   testWidgets('App renders TravelAlarm home', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
+    await tester.pump(const Duration(milliseconds: 200));
 
     // AppBar title
     expect(find.text('TravelAlarm'), findsOneWidget);
-    // Destination map picker
-    expect(find.text('Pick destination on map'), findsOneWidget);
-    // Start button
-    expect(find.text('Start'), findsOneWidget);
+    expect(find.text('Alert distance'), findsOneWidget);
+    expect(find.text('Start alert'), findsOneWidget);
+    expect(find.text('Add destination'), findsOneWidget);
   });
 }

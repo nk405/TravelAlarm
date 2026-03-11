@@ -11,6 +11,7 @@ class DestinationStore {
 
   static const String _destinationsKey = 'destinations';
   static const String _activeIdKey = 'active_destination_id';
+  static const String _adaptiveRadiusEnabledKey = 'adaptive_radius_enabled';
 
   Future<List<Destination>> loadDestinations() async {
     try {
@@ -33,6 +34,11 @@ class DestinationStore {
     return prefs.getString(_activeIdKey);
   }
 
+  Future<bool> loadAdaptiveRadiusEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_adaptiveRadiusEnabledKey) ?? true;
+  }
+
   Future<void> saveDestinations(List<Destination> destinations) async {
     final prefs = await SharedPreferences.getInstance();
     final payload = jsonEncode(destinations.map((d) => d.toJson()).toList());
@@ -46,5 +52,10 @@ class DestinationStore {
     } else {
       await prefs.setString(_activeIdKey, id);
     }
+  }
+
+  Future<void> saveAdaptiveRadiusEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_adaptiveRadiusEnabledKey, enabled);
   }
 }

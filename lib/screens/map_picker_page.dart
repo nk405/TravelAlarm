@@ -40,6 +40,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
   bool _routing = false;
   String? _routeError;
   List<ll.LatLng> _routePoints = const [];
+  bool _routeFromCache = false;
 
   @override
   void initState() {
@@ -103,6 +104,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
       _selected = latLng;
       _routeError = null;
       _routePoints = const [];
+      _routeFromCache = false;
     });
     unawaited(_updateRouteIfPossible());
   }
@@ -131,12 +133,14 @@ class _MapPickerPageState extends State<MapPickerPage> {
       if (!mounted) return;
       setState(() {
         _routePoints = points;
+        _routeFromCache = result.dataSource == RouteDataSource.cache;
         _routeError = points.isEmpty ? 'No route found' : null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _routePoints = const [];
+        _routeFromCache = false;
         _routeError = 'Route unavailable. Check internet connection.';
       });
     } finally {
@@ -225,6 +229,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
       _searchError = null;
       _routeError = null;
       _routePoints = const [];
+      _routeFromCache = false;
     });
     _mapController.move(r.point, 15);
     unawaited(_updateRouteIfPossible());
@@ -473,13 +478,21 @@ class _MapPickerPageState extends State<MapPickerPage> {
                   ),
                 ],
               ),
-              if (_selected != null && (_routing || _routeError != null)) ...[
+              if (_selected != null &&
+                  (_routing || _routeError != null || _routeFromCache)) ...[
                 const SizedBox(height: 8),
                 Text(
-                  _routing ? 'Fetching route...' : _routeError!,
+                  _routing
+                      ? 'Fetching route...'
+                      : _routeError ?? 'Showing cached route for offline use.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _routing ? colors.onSurface : colors.error,
+                    color:
+                        _routing
+                            ? colors.onSurface
+                            : (_routeError == null
+                                ? colors.onSurfaceVariant
+                                : colors.error),
                     fontSize: 13,
                   ),
                 ),
