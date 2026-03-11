@@ -7,10 +7,10 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pump(const Duration(milliseconds: 200));
 
-    // AppBar title
     expect(find.text('TravelAlarm'), findsOneWidget);
-    expect(find.text('Alert distance'), findsOneWidget);
-    expect(find.text('Start alert'), findsOneWidget);
-    expect(find.text('Add destination'), findsOneWidget);
+    expect(find.text('Quick access'), findsOneWidget);
+    expect(find.text('Destinations'), findsAtLeastNWidgets(1));
+    expect(find.text('Alert'), findsOneWidget);
+    expect(find.text('Monitor'), findsOneWidget);
   });
 }
