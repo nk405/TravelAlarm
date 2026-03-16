@@ -1,0 +1,45 @@
+{
+  "modelAssetPath": "model/weather_model.tflite",
+  "labels": [
+    "Cloudy",
+    "Rainy",
+    "Snowy",
+    "Sunny"
+  ],
+  "featureMeans": [
+    19.09722222222222,
+    68.67539983164983,
+    9.890204124579125,
+    53.69107744107744
+  ],
+  "featureStds": [
+    17.324912261727135,
+    20.170750506029723,
+    6.9063615730128385,
+    32.038836721002845
+  ],
+  "confidenceThreshold": 0.45,
+  "featureOrder": [
+    "Temperature",
+    "Humidity",
+    "Wind Speed",
+    "PrecipitationProxyPct"
+  ],
+  "labelSuggestions": {
+    "Cloudy": [
+      "Mild weather. Standard travel prep is fine."
+    ],
+    "Rainy": [
+      "Carry an umbrella.",
+      "Expect slower travel."
+    ],
+    "Snowy": [
+      "Wear warm layers.",
+      "Use non-slip footwear."
+    ],
+    "Sunny": [
+      "Stay hydrated.",
+      "Use sun protection."
+    ]
+  }
+}

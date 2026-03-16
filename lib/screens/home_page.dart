@@ -7,6 +7,8 @@ import '../models/destination.dart';
 import '../services/destination_store.dart';
 import '../services/geofence_monitor.dart';
 import '../services/notification_service.dart';
+import '../services/weather_ai_service.dart';
+import '../services/weather_service.dart';
 import '../widgets/home_components.dart';
 import 'alert_settings_screen.dart';
 import 'destinations_screen.dart';
@@ -30,7 +32,11 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<Destination> _destinations = [];
   String? _activeDestinationId;
   bool _loadingDestinations = true;
+  bool _loadingWeather = false;
   int _selectedIndex = 0;
+  DestinationWeather? _activeDestinationWeather;
+  WeatherAiSuggestionResult? _activeAiSuggestions;
+  String? _weatherError;
 
   final MapController _mainMapController = MapController();
   bool _followUserOnMainMap = true;
@@ -98,12 +104,17 @@ class _MyHomePageState extends State<MyHomePage> {
       _loadingDestinations = false;
     });
 
-    await DestinationStore.instance.saveActiveDestinationId(_activeDestinationId);
+    await DestinationStore.instance.saveActiveDestinationId(
+      _activeDestinationId,
+    );
+    await _refreshActiveDestinationWeather();
   }
 
   Future<void> _persistDestinations() async {
     await DestinationStore.instance.saveDestinations(_destinations);
-    await DestinationStore.instance.saveActiveDestinationId(_activeDestinationId);
+    await DestinationStore.instance.saveActiveDestinationId(
+      _activeDestinationId,
+    );
   }
 
   Future<void> _requestLocationPermission() async {
@@ -166,14 +177,15 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_monitor != null) {
       await _stopMonitoring();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Monitoring stopped')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Monitoring stopped')));
       }
     }
 
     setState(() => _activeDestinationId = id);
     await _persistDestinations();
+    await _refreshActiveDestinationWeather();
   }
 
   Future<String?> _promptDestinationName() async {
@@ -208,13 +220,14 @@ class _MyHomePageState extends State<MyHomePage> {
       _selectedIndex = 1;
     });
     await _persistDestinations();
+    await _refreshActiveDestinationWeather();
 
     if (_monitor != null) {
       await _stopMonitoring();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Monitoring stopped')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Monitoring stopped')));
       }
     }
   }
@@ -301,6 +314,71 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
     await _persistDestinations();
+    await _refreshActiveDestinationWeather();
+  }
+
+  Future<void> _refreshActiveDestinationWeather() async {
+    final destination = _activeDestination;
+    if (destination == null) {
+      if (!mounted) return;
+      setState(() {
+        _activeDestinationWeather = null;
+        _activeAiSuggestions = null;
+        _loadingWeather = false;
+        _weatherError = null;
+      });
+      return;
+    }
+
+    final requestDestinationId = destination.id;
+    final cached = await WeatherService.loadFreshCachedWeather(
+      latitude: destination.latitude,
+      longitude: destination.longitude,
+    );
+
+    if (!mounted || _activeDestinationId != requestDestinationId) return;
+    setState(() {
+      _activeDestinationWeather = cached;
+      _activeAiSuggestions = null;
+      _loadingWeather = true;
+      _weatherError = null;
+    });
+
+    if (cached != null) {
+      final cachedAi = await WeatherAiService.instance.predictSuggestions(
+        cached,
+      );
+      if (!mounted || _activeDestinationId != requestDestinationId) return;
+      setState(() {
+        _activeAiSuggestions = cachedAi;
+      });
+    }
+
+    try {
+      final latest = await WeatherService.fetchCurrentWeather(
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+      );
+
+      if (!mounted || _activeDestinationId != requestDestinationId) return;
+      final aiResult = await WeatherAiService.instance.predictSuggestions(
+        latest,
+      );
+      if (!mounted || _activeDestinationId != requestDestinationId) return;
+      setState(() {
+        _activeDestinationWeather = latest;
+        _activeAiSuggestions = aiResult;
+        _loadingWeather = false;
+        _weatherError = null;
+      });
+    } catch (_) {
+      if (!mounted || _activeDestinationId != requestDestinationId) return;
+      setState(() {
+        _loadingWeather = false;
+        _weatherError =
+            'Unable to refresh weather right now. Suggestions may be outdated.';
+      });
+    }
   }
 
   void _selectPage(int index) {
@@ -309,18 +387,27 @@ class _MyHomePageState extends State<MyHomePage> {
 
   List<Widget> _buildPages() {
     final activeDestination = _activeDestination;
-    final activeLatLng = activeDestination == null
-        ? null
-        : ll.LatLng(activeDestination.latitude, activeDestination.longitude);
+    final activeLatLng =
+        activeDestination == null
+            ? null
+            : ll.LatLng(
+              activeDestination.latitude,
+              activeDestination.longitude,
+            );
 
     return [
       HomeOverviewScreen(
         activeDestination: activeDestination,
         destinationCount: _destinations.length,
         loadingDestinations: _loadingDestinations,
+        weather: _activeDestinationWeather,
+        aiSuggestionResult: _activeAiSuggestions,
+        loadingWeather: _loadingWeather,
+        weatherError: _weatherError,
         isMonitoring: _monitor != null,
         radiusLabel: _buildRadiusBadgeLabel(),
         adaptiveRadiusEnabled: _useAdaptiveRadius,
+        onRefreshWeather: _refreshActiveDestinationWeather,
         onOpenDestinations: () => _selectPage(1),
         onOpenAlertSettings: () => _selectPage(2),
         onOpenMonitoring: () => _selectPage(3),
@@ -418,16 +505,17 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-      floatingActionButton: _selectedIndex == 1
-          ? FloatingActionButton.extended(
-              onPressed: _addDestination,
-              icon: const Icon(Icons.add_location_alt_outlined),
-              label: const Text('Add destination'),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            )
-          : null,
+      floatingActionButton:
+          _selectedIndex == 1
+              ? FloatingActionButton.extended(
+                onPressed: _addDestination,
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Add destination'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              )
+              : null,
     );
   }
 

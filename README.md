@@ -26,6 +26,7 @@ Flutter Android app scaffold.
 - Pick destination on a map (OpenStreetMap tiles via `flutter_map`)
 - Sends a local notification when you enter the radius (Android 13+ will prompt for notification permission)
 - Plays a looping alarm sound when you enter the radius (system alarm via `flutter_ringtone_player`)
+- Fetches destination weather from Open-Meteo and shows travel suggestions (umbrella, warm layer, wind/heat caution)
 
 ## Permissions
 
