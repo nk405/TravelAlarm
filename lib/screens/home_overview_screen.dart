@@ -1,9 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../models/destination.dart';
 import '../services/weather_ai_service.dart';
 import '../services/weather_service.dart';
 import '../widgets/home_components.dart';
+
+class PreTripChecklistState {
+  const PreTripChecklistState({
+    required this.hasDestination,
+    required this.locationServicesEnabled,
+    required this.locationPermission,
+    required this.monitoringReady,
+  });
+
+  final bool hasDestination;
+  final bool? locationServicesEnabled;
+  final LocationPermission? locationPermission;
+  final String monitoringReady;
+
+  bool get hasLocationPermission {
+    final permission = locationPermission;
+    if (permission == null) return false;
+    return permission != LocationPermission.denied &&
+        permission != LocationPermission.deniedForever;
+  }
+
+  bool get allGood {
+    return hasDestination &&
+        locationServicesEnabled == true &&
+        hasLocationPermission;
+  }
+}
 
 class HomeOverviewScreen extends StatelessWidget {
   const HomeOverviewScreen({
@@ -18,6 +46,12 @@ class HomeOverviewScreen extends StatelessWidget {
     required this.isMonitoring,
     required this.radiusLabel,
     required this.adaptiveRadiusEnabled,
+    required this.quickDestinations,
+    required this.activeDestinationId,
+    required this.preTripChecklistState,
+    required this.onRunPreTripChecklist,
+    required this.onSelectQuickDestination,
+    required this.onStartMonitoring,
     required this.onRefreshWeather,
     required this.onOpenDestinations,
     required this.onOpenAlertSettings,
@@ -34,6 +68,12 @@ class HomeOverviewScreen extends StatelessWidget {
   final bool isMonitoring;
   final String radiusLabel;
   final bool adaptiveRadiusEnabled;
+  final List<Destination> quickDestinations;
+  final String? activeDestinationId;
+  final PreTripChecklistState preTripChecklistState;
+  final Future<void> Function() onRunPreTripChecklist;
+  final Future<void> Function(String destinationId) onSelectQuickDestination;
+  final Future<void> Function() onStartMonitoring;
   final VoidCallback onRefreshWeather;
   final VoidCallback onOpenDestinations;
   final VoidCallback onOpenAlertSettings;
@@ -143,6 +183,130 @@ class HomeOverviewScreen extends StatelessWidget {
           ],
           Text('Quick access', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
+          CardSection(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.flash_on_outlined, color: colors.primary),
+                    const SizedBox(width: 8),
+                    Text('Quick trip setup', style: theme.textTheme.titleSmall),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Pick a common destination and start monitoring in one step.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (quickDestinations.isEmpty)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onOpenDestinations,
+                      icon: const Icon(Icons.add_location_alt_outlined),
+                      label: const Text('Add your first destination'),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final destination in quickDestinations)
+                        FilterChip(
+                          selected: destination.id == activeDestinationId,
+                          onSelected:
+                              (_) => onSelectQuickDestination(destination.id),
+                          label: Text(destination.name),
+                          avatar: Icon(
+                            destination.id == activeDestinationId
+                                ? Icons.check_circle_outline
+                                : Icons.place_outlined,
+                            size: 18,
+                          ),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed:
+                        activeDestination == null
+                            ? null
+                            : () => onStartMonitoring(),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Start trip monitoring'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (false)
+            CardSection(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.checklist_rtl, color: colors.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Pre-trip checklist',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: () => onRunPreTripChecklist(),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _ChecklistItem(
+                    title: 'Destination selected',
+                    ready: preTripChecklistState.hasDestination,
+                  ),
+                  const SizedBox(height: 6),
+                  _ChecklistItem(
+                    title: 'Location services enabled',
+                    ready:
+                        preTripChecklistState.locationServicesEnabled == true,
+                  ),
+                  const SizedBox(height: 6),
+                  _ChecklistItem(
+                    title: 'Location permission granted',
+                    ready: preTripChecklistState.hasLocationPermission,
+                  ),
+                  const SizedBox(height: 6),
+                  _ChecklistItem(
+                    title:
+                        'Alert readiness: ${preTripChecklistState.monitoringReady}',
+                    ready: preTripChecklistState.monitoringReady != 'Paused',
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    preTripChecklistState.allGood
+                        ? 'You are ready to start your trip alert.'
+                        : 'Resolve pending items before relying on arrival alerts.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 12),
           _OverviewActionCard(
             icon: Icons.place_outlined,
             title: 'Destinations',
@@ -174,6 +338,29 @@ class HomeOverviewScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ChecklistItem extends StatelessWidget {
+  const _ChecklistItem({required this.title, required this.ready});
+
+  final String title;
+  final bool ready;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(
+          ready ? Icons.check_circle : Icons.error_outline,
+          size: 18,
+          color: ready ? Colors.green : colors.error,
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(title)),
+      ],
     );
   }
 }

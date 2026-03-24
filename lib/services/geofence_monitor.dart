@@ -52,6 +52,14 @@ class GeofenceMonitor {
     null,
   );
 
+  final ValueNotifier<double?> currentAccuracyMeters = ValueNotifier<double?>(
+    null,
+  );
+
+  final ValueNotifier<DateTime?> lastPositionFixAt = ValueNotifier<DateTime?>(
+    null,
+  );
+
   final ValueNotifier<bool> monitoring = ValueNotifier<bool>(false);
 
   void setBaseRadius(double value) {
@@ -97,6 +105,8 @@ class GeofenceMonitor {
     routePoints.value = const [];
     currentDistanceMeters.value = null;
     currentSpeedMetersPerSecond.value = 0;
+    currentAccuracyMeters.value = null;
+    lastPositionFixAt.value = null;
     _smoothedSpeedMetersPerSecond = 0;
     _lastStatusNotificationAt = null;
     _lastStatusMeters = null;
@@ -115,6 +125,11 @@ class GeofenceMonitor {
       (pos) {
         final here = ll.LatLng(pos.latitude, pos.longitude);
         currentPosition.value = here;
+        currentAccuracyMeters.value =
+            pos.accuracy.isFinite
+                ? pos.accuracy.clamp(0, 200).toDouble()
+                : null;
+        lastPositionFixAt.value = pos.timestamp;
         _updateSpeed(pos.speed);
 
         final dist = haversineDistanceMeters(
@@ -293,6 +308,8 @@ class GeofenceMonitor {
     await _sub?.cancel();
     monitoring.value = false;
     currentSpeedMetersPerSecond.value = 0;
+    currentAccuracyMeters.value = null;
+    lastPositionFixAt.value = null;
     _smoothedSpeedMetersPerSecond = 0;
     _updateEffectiveRadius();
     await AlarmService.instance.stopAlarm();
@@ -308,6 +325,8 @@ class GeofenceMonitor {
     effectiveRadiusMeters.dispose();
     routePoints.dispose();
     currentPosition.dispose();
+    currentAccuracyMeters.dispose();
+    lastPositionFixAt.dispose();
     monitoring.dispose();
   }
 }

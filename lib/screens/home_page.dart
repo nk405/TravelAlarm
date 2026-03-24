@@ -37,6 +37,8 @@ class _MyHomePageState extends State<MyHomePage> {
   DestinationWeather? _activeDestinationWeather;
   WeatherAiSuggestionResult? _activeAiSuggestions;
   String? _weatherError;
+  bool? _locationServicesEnabled;
+  LocationPermission? _locationPermission;
 
   final MapController _mainMapController = MapController();
   bool _followUserOnMainMap = true;
@@ -54,6 +56,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     NotificationService.instance.init();
     _loadDestinations();
+    _refreshPreTripReadiness();
   }
 
   @override
@@ -122,6 +125,17 @@ class _MyHomePageState extends State<MyHomePage> {
     if (permission == LocationPermission.denied) {
       await Geolocator.requestPermission();
     }
+    await _refreshPreTripReadiness();
+  }
+
+  Future<void> _refreshPreTripReadiness() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final permission = await Geolocator.checkPermission();
+    if (!mounted) return;
+    setState(() {
+      _locationServicesEnabled = serviceEnabled;
+      _locationPermission = permission;
+    });
   }
 
   Future<void> _startMonitoring() async {
@@ -163,12 +177,14 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _selectedIndex = 3;
     });
+    await _refreshPreTripReadiness();
   }
 
   Future<void> _stopMonitoring() async {
     await _monitor?.stop();
     if (!mounted) return;
     setState(() {});
+    await _refreshPreTripReadiness();
   }
 
   Future<void> _setActiveDestination(String? id) async {
@@ -383,6 +399,62 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _selectPage(int index) {
     setState(() => _selectedIndex = index);
+    if (index == 0 || index == 3) {
+      _refreshPreTripReadiness();
+    }
+  }
+
+  Future<void> _startMonitoringFromHome() async {
+    await _startMonitoring();
+  }
+
+  Future<void> _activateDestinationFromHome(String destinationId) async {
+    await _setActiveDestination(destinationId);
+    if (!mounted) return;
+    setState(() {
+      _selectedIndex = 3;
+    });
+  }
+
+  List<Destination> _buildQuickDestinationCandidates() {
+    if (_destinations.isEmpty) return const <Destination>[];
+
+    final lowerPriorityKeywords = <String>['home', 'work', 'office', 'airport'];
+    final scored =
+        _destinations.map((destination) {
+            final name = destination.name.toLowerCase();
+            var score = 0;
+            for (final keyword in lowerPriorityKeywords) {
+              if (name.contains(keyword)) {
+                score += 2;
+              }
+            }
+            if (destination.id == _activeDestinationId) {
+              score += 1;
+            }
+            return (destination: destination, score: score);
+          }).toList()
+          ..sort((a, b) {
+            final byScore = b.score.compareTo(a.score);
+            if (byScore != 0) return byScore;
+            return a.destination.name.compareTo(b.destination.name);
+          });
+
+    return scored.take(4).map((item) => item.destination).toList();
+  }
+
+  String _buildAlertReadinessLabel() {
+    final monitor = _monitor;
+    if (monitor == null) return 'Ready';
+
+    final isRunning = monitor.monitoring.value;
+    if (!isRunning) return 'Paused';
+
+    if (monitor.currentPosition.value == null) {
+      return 'Starting';
+    }
+
+    return 'Running';
   }
 
   List<Widget> _buildPages() {
@@ -407,6 +479,17 @@ class _MyHomePageState extends State<MyHomePage> {
         isMonitoring: _monitor != null,
         radiusLabel: _buildRadiusBadgeLabel(),
         adaptiveRadiusEnabled: _useAdaptiveRadius,
+        quickDestinations: _buildQuickDestinationCandidates(),
+        activeDestinationId: _activeDestinationId,
+        preTripChecklistState: PreTripChecklistState(
+          hasDestination: activeDestination != null,
+          locationServicesEnabled: _locationServicesEnabled,
+          locationPermission: _locationPermission,
+          monitoringReady: _buildAlertReadinessLabel(),
+        ),
+        onRunPreTripChecklist: _refreshPreTripReadiness,
+        onSelectQuickDestination: _activateDestinationFromHome,
+        onStartMonitoring: _startMonitoringFromHome,
         onRefreshWeather: _refreshActiveDestinationWeather,
         onOpenDestinations: () => _selectPage(1),
         onOpenAlertSettings: () => _selectPage(2),
@@ -452,6 +535,7 @@ class _MyHomePageState extends State<MyHomePage> {
         onStartMonitoring: _startMonitoring,
         onStopMonitoring: _stopMonitoring,
         formatDistance: _formatDistance,
+        formatSpeed: _formatSpeed,
       ),
     ];
   }
