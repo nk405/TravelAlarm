@@ -10,6 +10,48 @@ import '../services/route_service.dart';
 import '../utils/adaptive_alert_distance.dart';
 import '../utils/distance.dart';
 
+class _SamplingProfile {
+  const _SamplingProfile({
+    required this.label,
+    required this.accuracy,
+    required this.distanceFilterMeters,
+    required this.interval,
+  });
+
+  final String label;
+  final LocationAccuracy accuracy;
+  final int distanceFilterMeters;
+  final Duration interval;
+
+  static const _SamplingProfile near = _SamplingProfile(
+    label: 'High (near destination)',
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilterMeters: 10,
+    interval: Duration(seconds: 5),
+  );
+
+  static const _SamplingProfile approach = _SamplingProfile(
+    label: 'Balanced (approaching)',
+    accuracy: LocationAccuracy.high,
+    distanceFilterMeters: 25,
+    interval: Duration(seconds: 10),
+  );
+
+  static const _SamplingProfile cruise = _SamplingProfile(
+    label: 'Low (en route)',
+    accuracy: LocationAccuracy.high,
+    distanceFilterMeters: 75,
+    interval: Duration(seconds: 20),
+  );
+
+  static const _SamplingProfile far = _SamplingProfile(
+    label: 'Battery saver (far away)',
+    accuracy: LocationAccuracy.medium,
+    distanceFilterMeters: 200,
+    interval: Duration(seconds: 40),
+  );
+}
+
 class GeofenceMonitor {
   GeofenceMonitor({
     required this.destLat,
@@ -27,6 +69,7 @@ class GeofenceMonitor {
 
   StreamSubscription<Position>? _sub;
   bool _entered = false;
+  bool _retuningSampling = false;
 
   bool _routing = false;
   DateTime? _lastRouteFetch;
@@ -35,6 +78,7 @@ class GeofenceMonitor {
   DateTime? _lastStatusNotificationAt;
   double? _lastStatusMeters;
   double _smoothedSpeedMetersPerSecond = 0;
+  _SamplingProfile _activeSamplingProfile = _SamplingProfile.approach;
 
   final ValueNotifier<double?> currentDistanceMeters = ValueNotifier<double?>(
     null,
@@ -58,6 +102,14 @@ class GeofenceMonitor {
 
   final ValueNotifier<DateTime?> lastPositionFixAt = ValueNotifier<DateTime?>(
     null,
+  );
+
+  final ValueNotifier<String> samplingProfileLabel = ValueNotifier<String>(
+    _SamplingProfile.approach.label,
+  );
+
+  final ValueNotifier<Duration> samplingInterval = ValueNotifier<Duration>(
+    _SamplingProfile.approach.interval,
   );
 
   final ValueNotifier<bool> monitoring = ValueNotifier<bool>(false);
@@ -110,6 +162,10 @@ class GeofenceMonitor {
     _smoothedSpeedMetersPerSecond = 0;
     _lastStatusNotificationAt = null;
     _lastStatusMeters = null;
+    _retuningSampling = false;
+    _activeSamplingProfile = _SamplingProfile.far;
+    samplingProfileLabel.value = _activeSamplingProfile.label;
+    samplingInterval.value = _activeSamplingProfile.interval;
     _updateEffectiveRadius();
 
     unawaited(
@@ -119,46 +175,16 @@ class GeofenceMonitor {
       ),
     );
 
+    await _subscribeToPositionStream();
+
+    return true;
+  }
+
+  Future<void> _subscribeToPositionStream() async {
     final settings = _buildLocationSettings();
-    _sub?.cancel();
+    await _sub?.cancel();
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen(
-      (pos) {
-        final here = ll.LatLng(pos.latitude, pos.longitude);
-        currentPosition.value = here;
-        currentAccuracyMeters.value =
-            pos.accuracy.isFinite
-                ? pos.accuracy.clamp(0, 200).toDouble()
-                : null;
-        lastPositionFixAt.value = pos.timestamp;
-        _updateSpeed(pos.speed);
-
-        final dist = haversineDistanceMeters(
-          pos.latitude,
-          pos.longitude,
-          destLat,
-          destLng,
-        );
-        currentDistanceMeters.value ??= dist;
-
-        unawaited(_maybeUpdateRoute(here, fallbackCrowDistanceMeters: dist));
-
-        final remaining = currentDistanceMeters.value ?? dist;
-        unawaited(_maybeUpdateMonitoringStatus(remaining));
-        final inside = remaining <= effectiveRadiusMeters.value;
-        if (inside && !_entered) {
-          _entered = true;
-          NotificationService.instance.showProximityAlert(
-            title: 'Approaching destination',
-            body:
-                'You are ${_formatDistance(remaining)} from your destination.',
-          );
-          AlarmService.instance.startAlarm();
-        }
-        if (!inside && _entered) {
-          _entered = false;
-          AlarmService.instance.stopAlarm();
-        }
-      },
+      _onPosition,
       onError: (e) {
         if (kDebugMode) {
           print('Position stream error: $e');
@@ -166,8 +192,93 @@ class GeofenceMonitor {
       },
       cancelOnError: false,
     );
+  }
 
-    return true;
+  void _onPosition(Position pos) {
+    final here = ll.LatLng(pos.latitude, pos.longitude);
+    currentPosition.value = here;
+    currentAccuracyMeters.value =
+        pos.accuracy.isFinite ? pos.accuracy.clamp(0, 200).toDouble() : null;
+    lastPositionFixAt.value = pos.timestamp;
+    _updateSpeed(pos.speed);
+
+    final dist = haversineDistanceMeters(
+      pos.latitude,
+      pos.longitude,
+      destLat,
+      destLng,
+    );
+    currentDistanceMeters.value ??= dist;
+
+    unawaited(_maybeRetuneSampling(dist));
+    unawaited(_maybeUpdateRoute(here, fallbackCrowDistanceMeters: dist));
+
+    final remaining = currentDistanceMeters.value ?? dist;
+    unawaited(_maybeUpdateMonitoringStatus(remaining));
+    final inside = remaining <= effectiveRadiusMeters.value;
+    if (inside && !_entered) {
+      _entered = true;
+      NotificationService.instance.showProximityAlert(
+        title: 'Approaching destination',
+        body: 'You are ${_formatDistance(remaining)} from your destination.',
+      );
+      AlarmService.instance.startAlarm();
+    }
+    if (!inside && _entered) {
+      _entered = false;
+      AlarmService.instance.stopAlarm();
+    }
+  }
+
+  _SamplingProfile _profileForDistance(double remainingMeters) {
+    if (_activeSamplingProfile == _SamplingProfile.near &&
+        remainingMeters <= 900) {
+      return _SamplingProfile.near;
+    }
+    if (_activeSamplingProfile == _SamplingProfile.approach &&
+        remainingMeters > 500 &&
+        remainingMeters <= 3200) {
+      return _SamplingProfile.approach;
+    }
+    if (_activeSamplingProfile == _SamplingProfile.cruise &&
+        remainingMeters > 1800 &&
+        remainingMeters <= 12000) {
+      return _SamplingProfile.cruise;
+    }
+    if (_activeSamplingProfile == _SamplingProfile.far &&
+        remainingMeters > 8000) {
+      return _SamplingProfile.far;
+    }
+
+    if (remainingMeters <= 700) {
+      return _SamplingProfile.near;
+    }
+    if (remainingMeters <= 2500) {
+      return _SamplingProfile.approach;
+    }
+    if (remainingMeters <= 10000) {
+      return _SamplingProfile.cruise;
+    }
+    return _SamplingProfile.far;
+  }
+
+  Future<void> _maybeRetuneSampling(double remainingMeters) async {
+    if (!monitoring.value || _retuningSampling) return;
+
+    final nextProfile = _profileForDistance(remainingMeters);
+    if (identical(nextProfile, _activeSamplingProfile)) {
+      return;
+    }
+
+    _retuningSampling = true;
+    try {
+      _activeSamplingProfile = nextProfile;
+      samplingProfileLabel.value = _activeSamplingProfile.label;
+      samplingInterval.value = _activeSamplingProfile.interval;
+      await _subscribeToPositionStream();
+    } finally {
+      _retuningSampling = false;
+    }
   }
 
   void _updateSpeed(double speedMetersPerSecond) {
@@ -274,17 +385,17 @@ class GeofenceMonitor {
 
   LocationSettings _buildLocationSettings() {
     if (kIsWeb) {
-      return const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 25,
+      return LocationSettings(
+        accuracy: _activeSamplingProfile.accuracy,
+        distanceFilter: _activeSamplingProfile.distanceFilterMeters,
       );
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 25,
-        intervalDuration: const Duration(seconds: 10),
+        accuracy: _activeSamplingProfile.accuracy,
+        distanceFilter: _activeSamplingProfile.distanceFilterMeters,
+        intervalDuration: _activeSamplingProfile.interval,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'TravelAlarm running',
           notificationText: 'Monitoring destination in background',
@@ -298,9 +409,9 @@ class GeofenceMonitor {
       );
     }
 
-    return const LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 25,
+    return LocationSettings(
+      accuracy: _activeSamplingProfile.accuracy,
+      distanceFilter: _activeSamplingProfile.distanceFilterMeters,
     );
   }
 
@@ -310,7 +421,11 @@ class GeofenceMonitor {
     currentSpeedMetersPerSecond.value = 0;
     currentAccuracyMeters.value = null;
     lastPositionFixAt.value = null;
+    _retuningSampling = false;
     _smoothedSpeedMetersPerSecond = 0;
+    _activeSamplingProfile = _SamplingProfile.approach;
+    samplingProfileLabel.value = _activeSamplingProfile.label;
+    samplingInterval.value = _activeSamplingProfile.interval;
     _updateEffectiveRadius();
     await AlarmService.instance.stopAlarm();
     await NotificationService.instance.cancelMonitoringStatus();
@@ -327,6 +442,8 @@ class GeofenceMonitor {
     currentPosition.dispose();
     currentAccuracyMeters.dispose();
     lastPositionFixAt.dispose();
+    samplingProfileLabel.dispose();
+    samplingInterval.dispose();
     monitoring.dispose();
   }
 }
