@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../models/destination.dart';
+import '../models/alarm_sync_snapshot.dart';
+import '../services/alarm_sync_service.dart';
 import '../services/destination_store.dart';
 import '../services/geofence_monitor.dart';
 import '../services/notification_service.dart';
@@ -33,6 +36,9 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _activeDestinationId;
   bool _loadingDestinations = true;
   bool _loadingWeather = false;
+  bool _syncBusy = false;
+  String? _syncStatus;
+  String? _lastCloudBackupLabel;
   int _selectedIndex = 0;
   DestinationWeather? _activeDestinationWeather;
   WeatherAiSuggestionResult? _activeAiSuggestions;
@@ -69,6 +75,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final clamped = value.clamp(50, 2000).toDouble();
     setState(() => _radius = clamped);
     _monitor?.setBaseRadius(clamped);
+    DestinationStore.instance.saveRadiusMeters(clamped);
   }
 
   Future<void> _setAdaptiveRadius(bool value) async {
@@ -91,6 +98,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _loadDestinations() async {
     final list = await DestinationStore.instance.loadDestinations();
     final activeId = await DestinationStore.instance.loadActiveDestinationId();
+    final radiusMeters = await DestinationStore.instance.loadRadiusMeters();
     final adaptiveRadiusEnabled =
         await DestinationStore.instance.loadAdaptiveRadiusEnabled();
     if (!mounted) return;
@@ -99,6 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _destinations
         ..clear()
         ..addAll(list);
+      _radius = radiusMeters;
       _useAdaptiveRadius = adaptiveRadiusEnabled;
       _activeDestinationId =
           _destinations.any((destination) => destination.id == activeId)
@@ -110,6 +119,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await DestinationStore.instance.saveActiveDestinationId(
       _activeDestinationId,
     );
+    await _refreshCloudBackupMeta();
     await _refreshActiveDestinationWeather();
   }
 
@@ -118,6 +128,204 @@ class _MyHomePageState extends State<MyHomePage> {
     await DestinationStore.instance.saveActiveDestinationId(
       _activeDestinationId,
     );
+  }
+
+  Future<void> _setSyncBusy(bool value, {String? status}) async {
+    if (!mounted) return;
+    setState(() {
+      _syncBusy = value;
+      if (status != null) {
+        _syncStatus = status;
+      }
+    });
+  }
+
+  Future<void> _signInWithGoogle() async {
+    await _setSyncBusy(true, status: 'Signing in with Google...');
+    try {
+      await AlarmSyncService.instance.signInWithGoogle();
+      await _refreshCloudBackupMeta();
+      await _setSyncBusy(false, status: 'Signed in with Google.');
+    } on SyncSignInCancelledException {
+      await _setSyncBusy(false, status: 'Google sign-in canceled.');
+    } on SyncNotConfiguredException {
+      await _setSyncBusy(
+        false,
+        status: 'Cloud sync is not configured yet for this app build.',
+      );
+    } on FirebaseAuthException catch (e) {
+      await _setSyncBusy(false, status: _mapAuthError(e));
+    } catch (_) {
+      await _setSyncBusy(
+        false,
+        status: 'Google sign-in failed. Please try again.',
+      );
+    }
+  }
+
+  Future<void> _signOutFromSync() async {
+    await _setSyncBusy(true, status: 'Signing out...');
+    try {
+      await AlarmSyncService.instance.signOut();
+      if (!mounted) return;
+      setState(() {
+        _syncBusy = false;
+        _syncStatus = 'Signed out.';
+        _lastCloudBackupLabel = null;
+      });
+    } catch (_) {
+      await _setSyncBusy(false, status: 'Unable to sign out right now.');
+    }
+  }
+
+  Future<void> _backupNow() async {
+    await _setSyncBusy(true, status: 'Uploading backup...');
+    try {
+      final snapshot = await DestinationStore.instance.loadSnapshot();
+      await AlarmSyncService.instance.backupNow(snapshot);
+      await _refreshCloudBackupMeta();
+      await _setSyncBusy(false, status: 'Backup completed.');
+    } on SyncNotConfiguredException {
+      await _setSyncBusy(
+        false,
+        status: 'Cloud sync is not configured yet for this app build.',
+      );
+    } on SyncUserNotSignedInException {
+      await _setSyncBusy(false, status: 'Sign in first to back up data.');
+    } catch (_) {
+      await _setSyncBusy(
+        false,
+        status: 'Backup failed. Check network and try again.',
+      );
+    }
+  }
+
+  Future<void> _restoreNow() async {
+    await _setSyncBusy(true, status: 'Checking cloud backup...');
+    try {
+      final remote = await AlarmSyncService.instance.fetchBackup();
+      if (remote == null) {
+        await _setSyncBusy(false, status: 'No cloud backup found.');
+        return;
+      }
+
+      final local = await DestinationStore.instance.loadSnapshot();
+      final shouldOverwrite = await _confirmRestoreIfNeeded(
+        local: local,
+        remote: remote,
+      );
+      if (shouldOverwrite != true) {
+        await _setSyncBusy(false, status: 'Restore canceled.');
+        return;
+      }
+
+      await DestinationStore.instance.saveSnapshot(
+        remote.snapshot.copyWith(
+          localUpdatedAtMillis: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+
+      await _loadDestinations();
+      await _setSyncBusy(false, status: 'Restore completed.');
+    } on SyncNotConfiguredException {
+      await _setSyncBusy(
+        false,
+        status: 'Cloud sync is not configured yet for this app build.',
+      );
+    } on SyncUserNotSignedInException {
+      await _setSyncBusy(false, status: 'Sign in first to restore backup.');
+    } catch (_) {
+      await _setSyncBusy(false, status: 'Restore failed. Please try again.');
+    }
+  }
+
+  Future<void> _refreshCloudBackupMeta() async {
+    final user = AlarmSyncService.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _lastCloudBackupLabel = null;
+      });
+      return;
+    }
+
+    try {
+      final remote = await AlarmSyncService.instance.fetchBackup();
+      if (!mounted) return;
+      setState(() {
+        _lastCloudBackupLabel =
+            remote == null
+                ? null
+                : _formatTimestamp(remote.cloudUpdatedAtMillis);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _lastCloudBackupLabel = null;
+      });
+    }
+  }
+
+  Future<bool?> _confirmRestoreIfNeeded({
+    required AlarmSyncSnapshot local,
+    required RemoteBackupState remote,
+  }) async {
+    final localTime = local.localUpdatedAtMillis;
+    final cloudTime = remote.cloudUpdatedAtMillis;
+    final localNewer = localTime > cloudTime;
+
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Restore cloud backup'),
+          content: Text(
+            localNewer
+                ? 'Local data looks newer than cloud backup. Overwrite this device with cloud data anyway?'
+                : 'This will replace local saved alarms and settings with the cloud backup.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Restore'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _mapAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Invalid email address.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'account-exists-with-different-credential':
+        return 'This email is already linked to another sign-in method.';
+      case 'network-request-failed':
+        return 'Network error. Check connection and try again.';
+      case 'email-already-in-use':
+        return 'Email already in use. Try signing in.';
+      case 'weak-password':
+        return 'Password must be at least 6 characters.';
+      default:
+        return 'Authentication failed. ${e.message ?? ''}'.trim();
+    }
+  }
+
+  String _formatTimestamp(int millis) {
+    final date = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+    final mm = date.month.toString().padLeft(2, '0');
+    final dd = date.day.toString().padLeft(2, '0');
+    final hh = date.hour.toString().padLeft(2, '0');
+    final min = date.minute.toString().padLeft(2, '0');
+    return '${date.year}-$mm-$dd $hh:$min';
   }
 
   Future<void> _requestLocationPermission() async {
@@ -503,6 +711,14 @@ class _MyHomePageState extends State<MyHomePage> {
         onDeleteDestination: _deleteDestination,
         onShowDetails: _showDestinationDetails,
         onAddDestination: _addDestination,
+        syncBusy: _syncBusy,
+        syncUserEmail: AlarmSyncService.instance.currentUser?.email,
+        syncStatus: _syncStatus,
+        lastBackupLabel: _lastCloudBackupLabel,
+        onSignInWithGoogle: _signInWithGoogle,
+        onSignOut: _signOutFromSync,
+        onBackupNow: _backupNow,
+        onRestoreNow: _restoreNow,
       ),
       AlertSettingsScreen(
         radius: _radius,

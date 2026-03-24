@@ -1,4 +1,5 @@
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'screens/home_page.dart';
@@ -6,7 +7,9 @@ import 'screens/home_page.dart';
 // Fallback seed colour used on devices without dynamic colour support (pre-Android 12).
 const _seedColor = Color(0xFF1A8FA6);
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 

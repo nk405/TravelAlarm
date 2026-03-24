@@ -27,6 +27,37 @@ Flutter Android app scaffold.
 - Sends a local notification when you enter the radius (Android 13+ will prompt for notification permission)
 - Plays a looping alarm sound when you enter the radius (system alarm via `flutter_ringtone_player`)
 - Fetches destination weather from Open-Meteo and shows travel suggestions (umbrella, warm layer, wind/heat caution)
+- Manual cloud backup/restore of saved alarms and destination settings (no realtime sync)
+
+## Cloud backup setup (Firebase)
+
+The app now includes manual backup/restore using Firebase Auth + Cloud Firestore.
+
+1. Create a Firebase project.
+2. Add Android app with package name `com.travelalarm.travelalarm`.
+3. Download `google-services.json` and place it in `android/app/google-services.json`.
+4. Generate FlutterFire config for this project:
+	 - Install CLI: `dart pub global activate flutterfire_cli`
+	 - Run: `flutterfire configure`
+5. Ensure Firestore is enabled in your Firebase project.
+6. Run the app and use Alert settings -> Cloud backup.
+
+If Firebase is not configured, the app will still run locally and show a message that cloud sync is not configured.
+
+### Suggested Firestore rules
+
+Use per-user document access only:
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+	match /databases/{database}/documents {
+		match /alarm_backups/{userId}/snapshots/{snapshotId} {
+			allow read, write: if request.auth != null && request.auth.uid == userId;
+		}
+	}
+}
+```
 
 ## Permissions
 

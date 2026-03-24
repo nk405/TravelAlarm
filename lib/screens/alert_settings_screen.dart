@@ -102,9 +102,10 @@ class AlertSettingsScreen extends StatelessWidget {
                 max: 2000,
                 divisions: 39,
                 value: radius,
-                label: useAdaptiveRadius
-                    ? 'Base ${radius.toStringAsFixed(0)} m'
-                    : '${radius.toStringAsFixed(0)} m',
+                label:
+                    useAdaptiveRadius
+                        ? 'Base ${radius.toStringAsFixed(0)} m'
+                        : '${radius.toStringAsFixed(0)} m',
                 onChanged: onSetRadius,
               ),
             ),

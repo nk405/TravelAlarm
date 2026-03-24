@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "46467963318",
+    "project_id": "travelalarm-196f0",
+    "storage_bucket": "travelalarm-196f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:46467963318:android:685e23e6ca585443a40917",
+        "android_client_info": {
+          "package_name": "com.travelalarm.travelalarm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "46467963318-n5jgbleobi575ip1k6dmokgo86mllp0u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.travelalarm.travelalarm",
+            "certificate_hash": "ef5072b178a43fc4a0f97f1dfba1967d6d364c6f"
+          }
+        },
+        {
+          "client_id": "46467963318-vjs7d11lqqrfott76ic85ep4qkeb84i4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.travelalarm.travelalarm",
+            "certificate_hash": "0698cbd4798e6244daa4ab74982e99f6303a1882"
+          }
+        },
+        {
+          "client_id": "46467963318-8ovnk09g0la84jkrn51bd6qj65edf4io.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKBz2ErbQRY_2o643XuZ7v1rAq_aJ9DZs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "46467963318-8ovnk09g0la84jkrn51bd6qj65edf4io.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
