@@ -13,7 +13,7 @@ import '../services/notification_service.dart';
 import '../services/weather_ai_service.dart';
 import '../services/weather_service.dart';
 import '../widgets/home_components.dart';
-import 'alert_settings_screen.dart';
+import 'settings_screen.dart';
 import 'destinations_screen.dart';
 import 'home_overview_screen.dart';
 import 'map_picker_page.dart';
@@ -52,9 +52,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   static const List<String> _pageTitles = <String>[
     'TravelAlarm',
-    'Destinations',
-    'Alert settings',
-    'Monitoring',
+    'Tracking Map',
+    'Saved Places',
+    'Settings',
   ];
 
   @override
@@ -383,7 +383,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (!mounted) return;
     setState(() {
-      _selectedIndex = 3;
+      _selectedIndex = 1;
     });
     await _refreshPreTripReadiness();
   }
@@ -441,7 +441,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _destinations.add(destination);
       _activeDestinationId = destination.id;
-      _selectedIndex = 1;
+      _selectedIndex = 2;
     });
     await _persistDestinations();
     await _refreshActiveDestinationWeather();
@@ -607,7 +607,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _selectPage(int index) {
     setState(() => _selectedIndex = index);
-    if (index == 0 || index == 3) {
+    if (index == 0 || index == 1) {
       _refreshPreTripReadiness();
     }
   }
@@ -620,7 +620,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await _setActiveDestination(destinationId);
     if (!mounted) return;
     setState(() {
-      _selectedIndex = 3;
+      _selectedIndex = 1;
     });
   }
 
@@ -699,36 +699,9 @@ class _MyHomePageState extends State<MyHomePage> {
         onSelectQuickDestination: _activateDestinationFromHome,
         onStartMonitoring: _startMonitoringFromHome,
         onRefreshWeather: _refreshActiveDestinationWeather,
-        onOpenDestinations: () => _selectPage(1),
-        onOpenAlertSettings: () => _selectPage(2),
-        onOpenMonitoring: () => _selectPage(3),
-      ),
-      DestinationsScreen(
-        loadingDestinations: _loadingDestinations,
-        destinations: _destinations,
-        activeDestinationId: _activeDestinationId,
-        onSelectDestination: _setActiveDestination,
-        onDeleteDestination: _deleteDestination,
-        onShowDetails: _showDestinationDetails,
-        onAddDestination: _addDestination,
-        syncBusy: _syncBusy,
-        syncUserEmail: AlarmSyncService.instance.currentUser?.email,
-        syncStatus: _syncStatus,
-        lastBackupLabel: _lastCloudBackupLabel,
-        onSignInWithGoogle: _signInWithGoogle,
-        onSignOut: _signOutFromSync,
-        onBackupNow: _backupNow,
-        onRestoreNow: _restoreNow,
-      ),
-      AlertSettingsScreen(
-        radius: _radius,
-        useAdaptiveRadius: _useAdaptiveRadius,
-        radiusBadgeLabel: _buildRadiusBadgeLabel(),
-        monitor: _monitor,
-        onSetRadius: _setRadius,
-        onSetAdaptiveRadius: _setAdaptiveRadius,
-        formatDistance: _formatDistance,
-        formatSpeed: _formatSpeed,
+        onOpenDestinations: () => _selectPage(2),
+        onOpenAlertSettings: () => _selectPage(3),
+        onOpenMonitoring: () => _selectPage(1),
       ),
       MonitoringScreen(
         activeDestination: activeDestination,
@@ -752,6 +725,33 @@ class _MyHomePageState extends State<MyHomePage> {
         onStopMonitoring: _stopMonitoring,
         formatDistance: _formatDistance,
         formatSpeed: _formatSpeed,
+      ),
+      DestinationsScreen(
+        loadingDestinations: _loadingDestinations,
+        destinations: _destinations,
+        activeDestinationId: _activeDestinationId,
+        onSelectDestination: _setActiveDestination,
+        onDeleteDestination: _deleteDestination,
+        onShowDetails: _showDestinationDetails,
+        onAddDestination: _addDestination,
+      ),
+      SettingsScreen(
+        radius: _radius,
+        useAdaptiveRadius: _useAdaptiveRadius,
+        radiusBadgeLabel: _buildRadiusBadgeLabel(),
+        monitor: _monitor,
+        onSetRadius: _setRadius,
+        onSetAdaptiveRadius: _setAdaptiveRadius,
+        formatDistance: _formatDistance,
+        formatSpeed: _formatSpeed,
+        syncBusy: _syncBusy,
+        syncUserEmail: AlarmSyncService.instance.currentUser?.email,
+        syncStatus: _syncStatus,
+        lastBackupLabel: _lastCloudBackupLabel,
+        onSignInWithGoogle: _signInWithGoogle,
+        onSignOut: _signOutFromSync,
+        onBackupNow: _backupNow,
+        onRestoreNow: _restoreNow,
       ),
     ];
   }
@@ -789,24 +789,24 @@ class _MyHomePageState extends State<MyHomePage> {
             label: 'Home',
           ),
           NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Trip Map',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.place_outlined),
             selectedIcon: Icon(Icons.place),
-            label: 'Destinations',
+            label: 'Places',
           ),
           NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Alert',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.radar_outlined),
-            selectedIcon: Icon(Icons.radar),
-            label: 'Monitor',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
       floatingActionButton:
-          _selectedIndex == 1
+          _selectedIndex == 2
               ? FloatingActionButton.extended(
                 onPressed: _addDestination,
                 icon: const Icon(Icons.add_location_alt_outlined),

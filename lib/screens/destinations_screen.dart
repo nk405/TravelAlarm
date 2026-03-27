@@ -13,14 +13,6 @@ class DestinationsScreen extends StatelessWidget {
     required this.onDeleteDestination,
     required this.onShowDetails,
     required this.onAddDestination,
-    required this.syncBusy,
-    required this.syncUserEmail,
-    required this.syncStatus,
-    required this.lastBackupLabel,
-    required this.onSignInWithGoogle,
-    required this.onSignOut,
-    required this.onBackupNow,
-    required this.onRestoreNow,
   });
 
   final bool loadingDestinations;
@@ -30,14 +22,6 @@ class DestinationsScreen extends StatelessWidget {
   final Future<void> Function(Destination destination) onDeleteDestination;
   final ValueChanged<Destination> onShowDetails;
   final VoidCallback onAddDestination;
-  final bool syncBusy;
-  final String? syncUserEmail;
-  final String? syncStatus;
-  final String? lastBackupLabel;
-  final VoidCallback onSignInWithGoogle;
-  final VoidCallback onSignOut;
-  final VoidCallback onBackupNow;
-  final VoidCallback onRestoreNow;
 
   @override
   Widget build(BuildContext context) {
@@ -101,104 +85,6 @@ class DestinationsScreen extends StatelessWidget {
                       );
                     },
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          CardSection(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.cloud_sync_outlined,
-                      color: colors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text('Cloud backup', style: theme.textTheme.titleSmall),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Manual backup and restore for switching devices. Changes are not synced in real time.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: colors.outlineVariant),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        syncUserEmail == null
-                            ? 'Not signed in'
-                            : 'Signed in as $syncUserEmail',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lastBackupLabel == null
-                            ? 'No cloud backup found yet.'
-                            : 'Last cloud backup: $lastBackupLabel',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (syncUserEmail == null)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: syncBusy ? null : onSignInWithGoogle,
-                      icon: const Icon(Icons.g_mobiledata),
-                      label: Text(
-                        syncBusy ? 'Working...' : 'Continue with Google',
-                      ),
-                    ),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: syncBusy ? null : onBackupNow,
-                        icon: const Icon(Icons.upload_outlined),
-                        label: const Text('Backup now'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: syncBusy ? null : onRestoreNow,
-                        icon: const Icon(Icons.download_outlined),
-                        label: const Text('Restore backup'),
-                      ),
-                      TextButton(
-                        onPressed: syncBusy ? null : onSignOut,
-                        child: const Text('Sign out'),
-                      ),
-                    ],
-                  ),
-                if (syncStatus != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    syncStatus!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
