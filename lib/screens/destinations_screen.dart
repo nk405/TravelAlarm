@@ -115,31 +115,44 @@ class _DestinationTile extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Material(
-      color: isActive ? colors.primaryContainer : colors.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
+      color:
+          isActive
+              ? colors.primaryContainer.withOpacity(0.5)
+              : colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color:
                       isActive
                           ? colors.primary
                           : colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow:
+                      isActive
+                          ? [
+                            BoxShadow(
+                              color: colors.primary.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                          : null,
                 ),
                 child: Icon(
                   isActive ? Icons.check_circle_rounded : Icons.place_outlined,
                   color: isActive ? colors.onPrimary : colors.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

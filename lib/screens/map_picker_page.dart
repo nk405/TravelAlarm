@@ -445,9 +445,15 @@ class _MapPickerPageState extends State<MapPickerPage> {
           margin: const EdgeInsets.all(12.0),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: colors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colors.outlineVariant),
+            color: colors.surfaceContainer,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

@@ -809,11 +809,8 @@ class _MyHomePageState extends State<MyHomePage> {
           _selectedIndex == 2
               ? FloatingActionButton.extended(
                 onPressed: _addDestination,
-                icon: const Icon(Icons.add_location_alt_outlined),
+                icon: const Icon(Icons.add_location_alt_rounded),
                 label: const Text('Add destination'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
               )
               : null,
     );
