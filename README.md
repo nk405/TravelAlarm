@@ -1,77 +1,104 @@
-# TravelAlarm
+﻿# TravelAlarm
 
-Flutter Android app scaffold.
+TravelAlarm is a Flutter-based Android app that triggers an alarm when you are close to your destination. It combines live location tracking, map-based destination selection, weather suggestions, and optional cloud sync.
 
-## Run on Android (Windows)
+## Highlights
 
-1. Install prerequisites:
-	- Android Studio (SDK + Platform Tools)
-	- Enable an emulator (AVD) or a physical device with USB debugging
-2. In this folder, run:
-	- `flutter doctor` – verify setup
-	- `flutter devices` – check an available Android device/emulator
-	- `flutter run` – launch the app on the selected device
+- Location-based destination alarms with configurable alert radius
+- OpenStreetMap destination picker
+- Weather recommendations using Open-Meteo
+- Optional cloud backup with Firebase Auth and Firestore
 
-## Project notes
+## Tech Stack
 
-- App display name (Android): `TravelAlarm` (see `android/app/src/main/AndroidManifest.xml`)
-- Package name: `com.travelalarm.travelalarm`
-- Entry point: `lib/main.dart`
-- Tests: `test/`
+- Flutter (Dart)
+- Firebase Authentication
+- Cloud Firestore
+- OpenStreetMap
+- Open-Meteo API
 
-## Features implemented
+## Project Structure
 
-- Foreground location monitoring using `geolocator`
-- Set a destination (lat/lng) and radius; shows current distance
-- Pick destination on a map (OpenStreetMap tiles via `flutter_map`)
-- Sends a local notification when you enter the radius (Android 13+ will prompt for notification permission)
-- Plays a looping alarm sound when you enter the radius (system alarm via `flutter_ringtone_player`)
-- Fetches destination weather from Open-Meteo and shows travel suggestions (umbrella, warm layer, wind/heat caution)
-- Manual cloud backup/restore of saved alarms and destination settings (no realtime sync)
+Key directories:
 
-## Cloud backup setup (Firebase)
+- lib/ - App source code (screens, services, models, widgets)
+- assets/ - Static assets used by the app
+- android/ - Android platform configuration and Gradle files
+- model/ - Local ML/weather model assets
+- test/ - Unit and widget tests
 
-The app now includes manual backup/restore using Firebase Auth + Cloud Firestore.
+## Prerequisites
 
-1. Create a Firebase project.
-2. Add Android app with package name `com.travelalarm.travelalarm`.
-3. Download `google-services.json` and place it in `android/app/google-services.json`.
-4. Generate FlutterFire config for this project:
-	 - Install CLI: `dart pub global activate flutterfire_cli`
-	 - Run: `flutterfire configure`
-5. Ensure Firestore is enabled in your Firebase project.
-6. Run the app and use Alert settings -> Cloud backup.
+Before running the app, make sure you have:
 
-If Firebase is not configured, the app will still run locally and show a message that cloud sync is not configured.
+- Flutter SDK installed and added to PATH
+- Android Studio with Android SDK and emulator support
+- A running Android emulator or a physical Android device
 
-### Suggested Firestore rules
+Verify your environment:
 
-Use per-user document access only:
-
-```txt
-rules_version = '2';
-service cloud.firestore {
-	match /databases/{database}/documents {
-		match /alarm_backups/{userId}/snapshots/{snapshotId} {
-			allow read, write: if request.auth != null && request.auth.uid == userId;
-		}
-	}
-}
+```bash
+flutter doctor
 ```
 
-## Permissions
+## Quick Start
 
-Declared in `android/app/src/main/AndroidManifest.xml`:
+1. Install dependencies:
 
-- `ACCESS_FINE_LOCATION`
-- `ACCESS_COARSE_LOCATION`
-- `POST_NOTIFICATIONS` (Android 13+)
-- `INTERNET` (to load map tiles)
+```bash
+flutter pub get
+```
 
-Note: Background alerts when the app is closed need additional setup (foreground service and background location permission). This scaffold alerts while the app is open. The map picker requires internet connectivity to load tiles.
+2. Run the app:
 
-## Useful links
+```bash
+flutter run
+```
 
-- Lab: Write your first Flutter app – https://docs.flutter.dev/get-started/codelab
-- Cookbook: Useful Flutter samples – https://docs.flutter.dev/cookbook
-- Flutter docs – https://docs.flutter.dev/
+## Build Release APK
+
+```bash
+flutter build apk --release
+```
+
+The generated APK is created under:
+
+- build/app/outputs/flutter-apk/
+
+## Firebase Setup (Optional)
+
+If you want cloud backup/sync for alarms and settings:
+
+1. Create a Firebase project.
+2. Add an Android app with package name: com.travelalarm.travelalarm
+3. Place google-services.json in android/app/
+4. Run FlutterFire configuration:
+
+```bash
+flutterfire configure
+```
+
+5. Enable Firebase Authentication and Cloud Firestore.
+6. Configure Firestore security rules so each user can only access their own data.
+
+## Required Permissions
+
+- Location: used to monitor distance to destination
+- Notifications: used to trigger arrival alerts
+- Internet: used for maps, weather lookup, and cloud sync
+
+## Running Tests
+
+```bash
+flutter test
+```
+
+## Troubleshooting
+
+- If Android build fails, run flutter doctor and resolve all reported issues.
+- If Firebase features do not work, confirm google-services.json is in android/app/ and that Firebase is initialized.
+- If location alarms do not trigger, verify location permission is granted and battery optimization is not restricting the app.
+
+## License
+
+This project is for final-year academic use unless a separate license is provided.
