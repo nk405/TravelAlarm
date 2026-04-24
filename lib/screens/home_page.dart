@@ -45,6 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _weatherError;
   bool? _locationServicesEnabled;
   LocationPermission? _locationPermission;
+  Future<void>? _stoppingMonitor;
 
   final MapController _mainMapController = MapController();
   bool _followUserOnMainMap = true;
@@ -357,7 +358,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     await _requestLocationPermission();
-    _monitor?.dispose();
+    await _stopMonitoring();
     _monitor = GeofenceMonitor(
       destLat: destination.latitude,
       destLng: destination.longitude,
@@ -389,12 +390,39 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _stopMonitoring() async {
-    await _monitor?.stop();
-    _monitor?.dispose();
+    final inFlight = _stoppingMonitor;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final monitor = _monitor;
+    if (monitor == null) {
+      await _refreshPreTripReadiness();
+      return;
+    }
+
+    // Clear state first so destination changes are not blocked by stop latency.
     _monitor = null;
-    if (!mounted) return;
-    setState(() {});
-    await _refreshPreTripReadiness();
+    if (mounted) {
+      setState(() {});
+    }
+
+    final stopTask = () async {
+      try {
+        await monitor.stop();
+      } finally {
+        monitor.dispose();
+      }
+      await _refreshPreTripReadiness();
+    }();
+
+    _stoppingMonitor = stopTask;
+    try {
+      await stopTask;
+    } finally {
+      _stoppingMonitor = null;
+    }
   }
 
   Future<void> _setActiveDestination(String? id) async {
