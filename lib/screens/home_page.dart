@@ -390,6 +390,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _stopMonitoring() async {
     await _monitor?.stop();
+    _monitor?.dispose();
+    _monitor = null;
     if (!mounted) return;
     setState(() {});
     await _refreshPreTripReadiness();
