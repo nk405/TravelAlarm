@@ -99,6 +99,3 @@ flutter test
 - If Firebase features do not work, confirm google-services.json is in android/app/ and that Firebase is initialized.
 - If location alarms do not trigger, verify location permission is granted and battery optimization is not restricting the app.
 
-## License
-
-This project is for final-year academic use unless a separate license is provided.
