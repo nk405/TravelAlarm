@@ -105,19 +105,19 @@ class MonitoringScreen extends StatelessWidget {
                       size: 20,
                     ),
                     const SizedBox(width: 8),
-                    Text('Alert status', style: theme.textTheme.titleSmall),
+                    Text('Arrival alert', style: theme.textTheme.titleSmall),
                   ],
                 ),
                 const SizedBox(height: 12),
                 if (monitor == null)
-                  StatusRow(label: 'Not running', color: colors.outline)
+                  StatusRow(label: 'Ready to start', color: colors.primary)
                 else
                   ValueListenableBuilder<bool>(
                     valueListenable: monitor!.monitoring,
                     builder: (context, running, _) {
                       return StatusRow(
                         label: running ? 'Running' : 'Paused',
-                        color: running ? colors.primary : colors.outline,
+                        color: running ? Colors.green : Colors.amber.shade800,
                         pulse: running,
                       );
                     },
@@ -133,7 +133,7 @@ class MonitoringScreen extends StatelessWidget {
                               ? null
                               : () => onStartMonitoring(),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start alert'),
+                      label: const Text('Start arrival alert'),
                     ),
                   )
                 else
@@ -148,12 +148,12 @@ class MonitoringScreen extends StatelessWidget {
                                 ? OutlinedButton.icon(
                                   onPressed: () => onStopMonitoring(),
                                   icon: const Icon(Icons.stop_rounded),
-                                  label: const Text('Stop alert'),
+                                  label: const Text('Stop arrival alert'),
                                 )
                                 : FilledButton.icon(
                                   onPressed: () => onStartMonitoring(),
                                   icon: const Icon(Icons.play_arrow_rounded),
-                                  label: const Text('Start alert'),
+                                  label: const Text('Start arrival alert'),
                                 ),
                       );
                     },
@@ -178,17 +178,8 @@ class MonitoringScreen extends StatelessWidget {
                             return ValueListenableBuilder<DateTime?>(
                               valueListenable: monitor!.lastPositionFixAt,
                               builder: (context, lastFix, _____) {
-                                final routePoints = monitor!.routePoints.value;
                                 final eta = _estimateEta(distance, speed);
                                 final gpsQuality = _gpsQualityLabel(accuracy);
-                                final confidence = _confidenceScore(
-                                  running: running,
-                                  distanceMeters: distance,
-                                  speedMetersPerSecond: speed,
-                                  gpsAccuracyMeters: accuracy,
-                                  hasRoute: routePoints.length > 1,
-                                );
-
                                 final readiness =
                                     running && activeDestination != null
                                         ? 'Alert active'
@@ -235,19 +226,18 @@ class MonitoringScreen extends StatelessWidget {
                                             value: gpsQuality,
                                             icon: Icons.gps_fixed,
                                           ),
-                                          // _StatusPill(
-                                          //   title: 'Confidence',
-                                          //   value: '$confidence%',
-                                          //   icon: Icons.shield_outlined,
-                                          // ),
                                         ],
                                       ),
                                       const SizedBox(height: 10),
                                       Text(
-                                        'Alarm readiness: $readiness',
+                                        'Arrival alert: $readiness',
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(
-                                              color: colors.onSurfaceVariant,
+                                              color:
+                                                  running
+                                                      ? Colors.green.shade800
+                                                      : colors.onSurfaceVariant,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                       ),
                                       if (lastFix != null) ...[
@@ -306,7 +296,7 @@ class MonitoringScreen extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               distance == null
-                                  ? 'Awaiting location...'
+                                  ? 'Waiting for GPS signal...'
                                   : formatDistance(distance),
                               style: theme.textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -516,45 +506,6 @@ String _gpsQualityLabel(double? accuracyMeters) {
   if (accuracyMeters <= 25) return 'Good';
   if (accuracyMeters <= 50) return 'Fair';
   return 'Poor';
-}
-
-int _confidenceScore({
-  required bool running,
-  required double? distanceMeters,
-  required double speedMetersPerSecond,
-  required double? gpsAccuracyMeters,
-  required bool hasRoute,
-}) {
-  if (!running || distanceMeters == null) return 0;
-
-  var score = 35;
-
-  if (hasRoute) {
-    score += 20;
-  }
-
-  if (speedMetersPerSecond > 1) {
-    score += 15;
-  }
-
-  final accuracy = gpsAccuracyMeters;
-  if (accuracy == null) {
-    score += 0;
-  } else if (accuracy <= 12) {
-    score += 30;
-  } else if (accuracy <= 25) {
-    score += 22;
-  } else if (accuracy <= 50) {
-    score += 12;
-  } else {
-    score += 5;
-  }
-
-  if (distanceMeters < 120) {
-    score -= 10;
-  }
-
-  return score.clamp(0, 99);
 }
 
 String _formatTime(DateTime dateTime) {

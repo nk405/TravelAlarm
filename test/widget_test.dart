@@ -10,7 +10,7 @@ void main() {
     expect(find.text('TravelAlarm'), findsOneWidget);
     expect(find.text('Quick access'), findsOneWidget);
     expect(find.text('Destinations'), findsAtLeastNWidgets(1));
-    expect(find.text('Alert'), findsOneWidget);
-    expect(find.text('Monitor'), findsOneWidget);
+    expect(find.text('Alert distance'), findsOneWidget);
+    expect(find.text('Monitoring'), findsOneWidget);
   });
 }

@@ -43,21 +43,25 @@ class StatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (pulse)
-          PulsingDot(color: color)
-        else
-          Icon(Icons.circle, size: 10, color: color),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
+    return Semantics(
+      liveRegion: true,
+      label: 'Status: $label',
+      child: Row(
+        children: [
+          if (pulse)
+            PulsingDot(color: color)
+          else
+            Icon(Icons.circle, size: 10, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

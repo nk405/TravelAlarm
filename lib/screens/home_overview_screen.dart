@@ -50,8 +50,10 @@ class HomeOverviewScreen extends StatelessWidget {
     required this.activeDestinationId,
     required this.preTripChecklistState,
     required this.onRunPreTripChecklist,
+    required this.onFixLocationAccess,
     required this.onSelectQuickDestination,
     required this.onStartMonitoring,
+    required this.onStopMonitoring,
     required this.onRefreshWeather,
     required this.onOpenDestinations,
     required this.onOpenAlertSettings,
@@ -72,8 +74,10 @@ class HomeOverviewScreen extends StatelessWidget {
   final String? activeDestinationId;
   final PreTripChecklistState preTripChecklistState;
   final Future<void> Function() onRunPreTripChecklist;
+  final Future<void> Function() onFixLocationAccess;
   final Future<void> Function(String destinationId) onSelectQuickDestination;
   final Future<void> Function() onStartMonitoring;
+  final Future<void> Function() onStopMonitoring;
   final VoidCallback onRefreshWeather;
   final VoidCallback onOpenDestinations;
   final VoidCallback onOpenAlertSettings;
@@ -163,6 +167,7 @@ class HomeOverviewScreen extends StatelessWidget {
                           isMonitoring
                               ? 'Monitoring active'
                               : 'Monitoring idle',
+                      color: isMonitoring ? Colors.green : colors.primary,
                     ),
                   ],
                 ),
@@ -191,12 +196,12 @@ class HomeOverviewScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.flash_on_outlined, color: colors.primary),
                     const SizedBox(width: 8),
-                    Text('Quick trip setup', style: theme.textTheme.titleSmall),
+                    Text('Your next trip', style: theme.textTheme.titleSmall),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Pick a common destination and start monitoring in one step.',
+                  'Choose where you are going, then TravelAlarm will alert you before you arrive.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),
@@ -238,74 +243,94 @@ class HomeOverviewScreen extends StatelessWidget {
                     onPressed:
                         activeDestination == null
                             ? null
+                            : isMonitoring
+                            ? () => onStopMonitoring()
                             : () => onStartMonitoring(),
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Start trip monitoring'),
+                    icon: Icon(
+                      isMonitoring
+                          ? Icons.stop_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    label: Text(
+                      isMonitoring
+                          ? 'Stop arrival alert'
+                          : 'Start arrival alert',
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          if (false)
-            CardSection(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.checklist_rtl, color: colors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Pre-trip checklist',
-                            style: theme.textTheme.titleSmall,
-                          ),
-                        ],
-                      ),
-                      TextButton.icon(
-                        onPressed: () => onRunPreTripChecklist(),
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Refresh'),
-                      ),
-                    ],
+          CardSection(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.checklist_rtl, color: colors.primary),
+                        const SizedBox(width: 8),
+                        Text('Ready to go?', style: theme.textTheme.titleSmall),
+                      ],
+                    ),
+                    IconButton(
+                      tooltip: 'Check again',
+                      onPressed: () => onRunPreTripChecklist(),
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _ChecklistItem(
+                  title: 'Choose your destination',
+                  ready: preTripChecklistState.hasDestination,
+                ),
+                const SizedBox(height: 8),
+                _ChecklistItem(
+                  title: 'Allow location access',
+                  ready: preTripChecklistState.hasLocationPermission,
+                ),
+                const SizedBox(height: 8),
+                _ChecklistItem(
+                  title: 'Location is turned on',
+                  ready: preTripChecklistState.locationServicesEnabled == true,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  preTripChecklistState.allGood
+                      ? 'Everything is ready for your trip.'
+                      : 'Complete the items above before starting an alert.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 8),
-                  _ChecklistItem(
-                    title: 'Destination selected',
-                    ready: preTripChecklistState.hasDestination,
+                ),
+                if (!preTripChecklistState.hasDestination) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onOpenDestinations,
+                      icon: const Icon(Icons.place_outlined),
+                      label: const Text('Choose a destination'),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  _ChecklistItem(
-                    title: 'Location services enabled',
-                    ready:
-                        preTripChecklistState.locationServicesEnabled == true,
-                  ),
-                  const SizedBox(height: 6),
-                  _ChecklistItem(
-                    title: 'Location permission granted',
-                    ready: preTripChecklistState.hasLocationPermission,
-                  ),
-                  const SizedBox(height: 6),
-                  _ChecklistItem(
-                    title:
-                        'Alert readiness: ${preTripChecklistState.monitoringReady}',
-                    ready: preTripChecklistState.monitoringReady != 'Paused',
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    preTripChecklistState.allGood
-                        ? 'You are ready to start your trip alert.'
-                        : 'Resolve pending items before relying on arrival alerts.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+                ] else if (!preTripChecklistState.allGood) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onFixLocationAccess,
+                      icon: const Icon(Icons.location_on_outlined),
+                      label: const Text('Fix location access'),
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
+          ),
           const SizedBox(height: 12),
           _OverviewActionCard(
             icon: Icons.place_outlined,
@@ -443,10 +468,11 @@ class _OverviewActionCard extends StatelessWidget {
 }
 
 class _StatChip extends StatelessWidget {
-  const _StatChip({required this.icon, required this.label});
+  const _StatChip({required this.icon, required this.label, this.color});
 
   final IconData icon;
   final String label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -461,7 +487,7 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: colors.primary),
+          Icon(icon, size: 18, color: color ?? colors.primary),
           const SizedBox(width: 8),
           Text(label),
         ],
@@ -599,7 +625,7 @@ class _DestinationWeatherCard extends StatelessWidget {
           if (weatherError != null) ...[
             const SizedBox(height: 8),
             Text(
-              weatherError!,
+              '${weatherError!} Arrival alerts still work.',
               style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
             ),
           ],

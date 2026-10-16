@@ -88,7 +88,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Choose how far in advance the alarm should fire before you arrive.',
+                  'Choose how far in advance to be notified before you arrive.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),
@@ -98,50 +98,57 @@ class SettingsScreen extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   value: useAdaptiveRadius,
                   onChanged: onSetAdaptiveRadius,
-                  title: const Text('Auto-adjust by speed'),
+                  title: const Text('Adjust automatically while driving'),
                   subtitle: Text(
                     useAdaptiveRadius
-                        ? 'Uses live speed to increase the alert radius before arrival.'
-                        : 'Uses only the fixed distance you set below.',
+                        ? 'The app gives you more time to slow down when you are moving faster.'
+                        : 'The alert will use the same distance every time.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 6,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 8,
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  title: const Text('Advanced settings'),
+                  subtitle: const Text('Fine-tune the warning distance'),
+                  children: [
+                    SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 6,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 8,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 18,
+                        ),
+                        activeTrackColor: colors.primary,
+                        inactiveTrackColor: colors.outlineVariant,
+                        thumbColor: colors.primary,
+                      ),
+                      child: Slider(
+                        min: 50,
+                        max: 2000,
+                        divisions: 39,
+                        value: radius,
+                        label:
+                            useAdaptiveRadius
+                                ? 'Base ${radius.toStringAsFixed(0)} m'
+                                : '${radius.toStringAsFixed(0)} m',
+                        onChanged: onSetRadius,
+                      ),
                     ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 18,
+                    Text(
+                      useAdaptiveRadius
+                          ? 'The app increases the warning distance when you are driving faster.'
+                          : 'The alert will use this same distance every time.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                    activeTrackColor: colors.primary,
-                    inactiveTrackColor: colors.outlineVariant,
-                    thumbColor: colors.primary,
-                  ),
-                  child: Slider(
-                    min: 50,
-                    max: 2000,
-                    divisions: 39,
-                    value: radius,
-                    label:
-                        useAdaptiveRadius
-                            ? 'Base ${radius.toStringAsFixed(0)} m'
-                            : '${radius.toStringAsFixed(0)} m',
-                    onChanged: onSetRadius,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  useAdaptiveRadius
-                      ? 'Base distance used by the predictor. The live alert radius grows with speed.'
-                      : 'Fixed alert distance before the alarm triggers.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 Wrap(

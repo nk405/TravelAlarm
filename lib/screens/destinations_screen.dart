@@ -61,9 +61,20 @@ class DestinationsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 if (loadingDestinations)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 36),
-                    child: Center(child: CircularProgressIndicator()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    child: Column(
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Loading your saved places...',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 else if (destinations.isEmpty)
                   _EmptyDestinationsState(onAddDestination: onAddDestination)

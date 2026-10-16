@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as ll;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/destination.dart';
 import '../models/alarm_sync_snapshot.dart';
@@ -46,6 +47,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool? _locationServicesEnabled;
   LocationPermission? _locationPermission;
   Future<void>? _stoppingMonitor;
+  VoidCallback? _monitorStatusListener;
 
   final MapController _mainMapController = MapController();
   bool _followUserOnMainMap = true;
@@ -57,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
     'Saved Places',
     'Settings',
   ];
+  static const _walkthroughSeenKey = 'first_use_walkthrough_seen';
 
   @override
   void initState() {
@@ -64,12 +67,90 @@ class _MyHomePageState extends State<MyHomePage> {
     NotificationService.instance.init();
     _loadDestinations();
     _refreshPreTripReadiness();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showFirstUseWalkthrough();
+    });
+  }
+
+  Future<void> _showFirstUseWalkthrough() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_walkthroughSeenKey) == true || !mounted) return;
+    await prefs.setBool(_walkthroughSeenKey, true);
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+        return AlertDialog(
+          title: const Text('Set up your first arrival alert'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TravelAlarm will notify you before you reach a saved place.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              _WalkthroughStep(
+                number: '1',
+                title: 'Choose a place',
+                subtitle: 'Pick your arrival point on the map.',
+                color: colors.primary,
+              ),
+              const SizedBox(height: 12),
+              _WalkthroughStep(
+                number: '2',
+                title: 'Allow location access',
+                subtitle: 'This lets the app follow your trip.',
+                color: colors.primary,
+              ),
+              const SizedBox(height: 12),
+              _WalkthroughStep(
+                number: '3',
+                title: 'Start the arrival alert',
+                subtitle: 'We will notify you before you arrive.',
+                color: colors.primary,
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Get started'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   void dispose() {
+    _removeMonitorStatusListener();
     _monitor?.dispose();
     super.dispose();
+  }
+
+  void _watchMonitorStatus(GeofenceMonitor monitor) {
+    _removeMonitorStatusListener();
+    void listener() {
+      if (mounted) setState(() {});
+    }
+
+    _monitorStatusListener = listener;
+    monitor.monitoring.addListener(listener);
+  }
+
+  void _removeMonitorStatusListener() {
+    final monitor = _monitor;
+    final listener = _monitorStatusListener;
+    if (monitor != null && listener != null) {
+      monitor.monitoring.removeListener(listener);
+    }
+    _monitorStatusListener = null;
   }
 
   void _setRadius(double value) {
@@ -337,6 +418,21 @@ class _MyHomePageState extends State<MyHomePage> {
     await _refreshPreTripReadiness();
   }
 
+  Future<void> _helpWithLocationAccess() async {
+    await _requestLocationPermission();
+    if (!mounted) return;
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final permission = await Geolocator.checkPermission();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+    } else if (permission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+    }
+
+    await _refreshPreTripReadiness();
+  }
+
   Future<void> _refreshPreTripReadiness() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     final permission = await Geolocator.checkPermission();
@@ -358,6 +454,49 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     await _requestLocationPermission();
+    final locationServicesEnabled = await Geolocator.isLocationServiceEnabled();
+    final locationPermission = await Geolocator.checkPermission();
+    final permissionBlocked =
+        locationPermission == LocationPermission.denied ||
+        locationPermission == LocationPermission.deniedForever;
+    if (!locationServicesEnabled || permissionBlocked) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          final needsAppSettings =
+              locationServicesEnabled &&
+              locationPermission == LocationPermission.deniedForever;
+          return AlertDialog(
+            title: const Text('Location access needed'),
+            content: Text(
+              needsAppSettings
+                  ? 'TravelAlarm needs location access to alert you near your destination. Open app settings and allow location access.'
+                  : 'Turn on Location so TravelAlarm can follow your trip and alert you before you arrive.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Not now'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  if (needsAppSettings) {
+                    await Geolocator.openAppSettings();
+                  } else {
+                    await Geolocator.openLocationSettings();
+                  }
+                  await _refreshPreTripReadiness();
+                },
+                child: const Text('Open settings'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
     await _stopMonitoring();
     _monitor = GeofenceMonitor(
       destLat: destination.latitude,
@@ -366,17 +505,17 @@ class _MyHomePageState extends State<MyHomePage> {
       radiusMeters: _radius,
       adaptiveRadiusEnabled: _useAdaptiveRadius,
     );
+    _watchMonitorStatus(_monitor!);
 
     final started = await _monitor!.start();
     if (!started) {
+      _removeMonitorStatusListener();
       _monitor?.dispose();
       _monitor = null;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Unable to start monitoring. Enable Location services and allow location permission.',
-          ),
+          content: Text('Unable to start the arrival alert. Please try again.'),
         ),
       );
       return;
@@ -403,6 +542,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     // Clear state first so destination changes are not blocked by stop latency.
+    _removeMonitorStatusListener();
     _monitor = null;
     if (mounted) {
       setState(() {});
@@ -471,10 +611,20 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _destinations.add(destination);
       _activeDestinationId = destination.id;
-      _selectedIndex = 2;
+      _selectedIndex = 0;
     });
     await _persistDestinations();
     await _refreshActiveDestinationWeather();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${destination.name} saved. Ready for an arrival alert.',
+          ),
+        ),
+      );
+    }
 
     if (_monitor != null) {
       await _stopMonitoring();
@@ -556,6 +706,8 @@ class _MyHomePageState extends State<MyHomePage> {
     );
     if (confirmed != true) return;
 
+    final removedIndex = _destinations.indexOf(destination);
+    final wasActive = _activeDestinationId == destination.id;
     if (_monitor != null && _activeDestinationId == destination.id) {
       await _stopMonitoring();
     }
@@ -569,6 +721,27 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     await _persistDestinations();
     await _refreshActiveDestinationWeather();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${destination.name} removed'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            if (_destinations.any((item) => item.id == destination.id)) return;
+            final insertAt = removedIndex.clamp(0, _destinations.length);
+            setState(() {
+              _destinations.insert(insertAt, destination);
+              if (wasActive) _activeDestinationId = destination.id;
+            });
+            await _persistDestinations();
+            await _refreshActiveDestinationWeather();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshActiveDestinationWeather() async {
@@ -714,7 +887,7 @@ class _MyHomePageState extends State<MyHomePage> {
         aiSuggestionResult: _activeAiSuggestions,
         loadingWeather: _loadingWeather,
         weatherError: _weatherError,
-        isMonitoring: _monitor != null,
+        isMonitoring: _monitor?.monitoring.value == true,
         radiusLabel: _buildRadiusBadgeLabel(),
         adaptiveRadiusEnabled: _useAdaptiveRadius,
         quickDestinations: _buildQuickDestinationCandidates(),
@@ -726,8 +899,10 @@ class _MyHomePageState extends State<MyHomePage> {
           monitoringReady: _buildAlertReadinessLabel(),
         ),
         onRunPreTripChecklist: _refreshPreTripReadiness,
+        onFixLocationAccess: _helpWithLocationAccess,
         onSelectQuickDestination: _activateDestinationFromHome,
         onStartMonitoring: _startMonitoringFromHome,
+        onStopMonitoring: _stopMonitoring,
         onRefreshWeather: _refreshActiveDestinationWeather,
         onOpenDestinations: () => _selectPage(2),
         onOpenAlertSettings: () => _selectPage(3),
@@ -871,5 +1046,46 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     return 'Auto ${effectiveRadius.toStringAsFixed(0)} m';
+  }
+}
+
+class _WalkthroughStep extends StatelessWidget {
+  const _WalkthroughStep({
+    required this.number,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final String number;
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: color,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          child: Text(number),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(subtitle, style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -473,7 +473,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
                     child: Text(
                       _selected == null
                           ? 'Tap on the map to select a destination'
-                          : '${_selected!.latitude.toStringAsFixed(5)}, ${_selected!.longitude.toStringAsFixed(5)}',
+                          : 'This pin is where you will receive the arrival alert.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color:
                             _selected == null
