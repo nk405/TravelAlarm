@@ -117,7 +117,7 @@ class _DestinationTile extends StatelessWidget {
     return Material(
       color:
           isActive
-              ? colors.primaryContainer.withOpacity(0.5)
+              ? colors.primaryContainer.withValues(alpha: 0.5)
               : colors.surfaceContainerLow,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
@@ -140,7 +140,7 @@ class _DestinationTile extends StatelessWidget {
                       isActive
                           ? [
                             BoxShadow(
-                              color: colors.primary.withOpacity(0.3),
+                              color: colors.primary.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),

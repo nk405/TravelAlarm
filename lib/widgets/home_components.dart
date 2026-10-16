@@ -18,7 +18,7 @@ class CardSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withOpacity(0.05),
+            color: colors.shadow.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -111,7 +111,13 @@ class _DestinationNameDialogState extends State<DestinationNameDialog> {
         children: [
           Icon(Icons.edit_location_alt_outlined, color: colors.primary),
           const SizedBox(width: 10),
-          const Text('Name your destination'),
+          const Expanded(
+            child: Text(
+              'Name your destination',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: TextField(

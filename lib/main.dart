@@ -68,7 +68,7 @@ class MyApp extends StatelessWidget {
       ),
       cardTheme: CardTheme(
         elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.05),
+        shadowColor: Colors.black.withValues(alpha: 0.05),
         surfaceTintColor: colorScheme.surfaceTint,
         color: colorScheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -173,7 +173,7 @@ class MyApp extends StatelessWidget {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,

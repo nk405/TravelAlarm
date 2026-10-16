@@ -449,7 +449,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow.withOpacity(0.05),
+                color: colors.shadow.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, -2),
               ),
