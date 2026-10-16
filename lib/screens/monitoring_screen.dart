@@ -40,6 +40,14 @@ class MonitoringScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final activeStatusColor =
+        theme.brightness == Brightness.dark
+            ? Colors.green.shade300
+            : Colors.green.shade700;
+    final waitingStatusColor =
+        theme.brightness == Brightness.dark
+            ? Colors.amber.shade300
+            : Colors.amber.shade800;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -117,7 +125,7 @@ class MonitoringScreen extends StatelessWidget {
                     builder: (context, running, _) {
                       return StatusRow(
                         label: running ? 'Running' : 'Paused',
-                        color: running ? Colors.green : Colors.amber.shade800,
+                        color: running ? activeStatusColor : waitingStatusColor,
                         pulse: running,
                       );
                     },
@@ -126,7 +134,6 @@ class MonitoringScreen extends StatelessWidget {
                 if (monitor == null)
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
                     child: FilledButton.icon(
                       onPressed:
                           activeDestination == null
@@ -142,7 +149,6 @@ class MonitoringScreen extends StatelessWidget {
                     builder: (context, running, _) {
                       return SizedBox(
                         width: double.infinity,
-                        height: 48,
                         child:
                             running
                                 ? OutlinedButton.icon(
@@ -235,7 +241,7 @@ class MonitoringScreen extends StatelessWidget {
                                             ?.copyWith(
                                               color:
                                                   running
-                                                      ? Colors.green.shade800
+                                                      ? activeStatusColor
                                                       : colors.onSurfaceVariant,
                                               fontWeight: FontWeight.w600,
                                             ),

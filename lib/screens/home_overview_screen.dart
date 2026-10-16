@@ -87,6 +87,10 @@ class HomeOverviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final activeStatusColor =
+        theme.brightness == Brightness.dark
+            ? Colors.green.shade300
+            : Colors.green.shade700;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -167,7 +171,7 @@ class HomeOverviewScreen extends StatelessWidget {
                           isMonitoring
                               ? 'Monitoring active'
                               : 'Monitoring idle',
-                      color: isMonitoring ? Colors.green : colors.primary,
+                      color: isMonitoring ? activeStatusColor : colors.primary,
                     ),
                   ],
                 ),

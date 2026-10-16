@@ -506,7 +506,6 @@ class _MapPickerPageState extends State<MapPickerPage> {
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: FilledButton.icon(
                   onPressed: _selected == null ? null : _confirm,
                   icon: const Icon(Icons.check_rounded),
